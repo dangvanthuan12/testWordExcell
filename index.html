@@ -1,0 +1,1385 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TestOnline_MOS - Thi Thử MOS Word & Excel (Trộn Câu & Trộn Đáp Án)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Inter:wght@400;500;600;700;800&display=swap');
+    :root {
+      --surface: #ffffff;
+      --ink: #121212;
+      --muted: #6b6b6b;
+      --line: #e8e2d9;
+      --accent: #ff4d2e;
+      --accent2: #111111;
+      --paper: #f6f5ef;
+    }
+    html, body, #root {
+      min-height: 100%;
+      margin: 0;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background-color: var(--paper);
+      color: #1a1a1a;
+    }
+    .font-display { font-family: 'Fraunces', Georgia, serif; }
+    .pulse { animation: pulse 1.5s infinite; }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.03); }
+      100% { transform: scale(1); }
+    }
+    .grid-dot {
+      background-image: radial-gradient(#000 1px, transparent 1px);
+      background-size: 16px 16px;
+      opacity: 0.06;
+    }
+    .card-shadow { box-shadow: 6px 6px 0px #121212; }
+    .card-shadow-sm { box-shadow: 3px 3px 0px #121212; }
+  </style>
+</head>
+<body class="selection:bg-[#111] selection:text-white">
+  <div id="root">
+    <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:sans-serif;color:#111;">
+      <div style="background:#fff;border:1px solid #111;border-radius:16px;padding:24px 32px;box-shadow:4px 4px 0 #111;">
+        <strong>Đang khởi tạo phòng thi TestOnline_MOS (Chế độ Trộn Đề & Độ Khó Cao)...</strong>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bẫy lỗi toàn cục tránh trắng trang -->
+  <script>
+    window.addEventListener("error", function (ev) {
+      var root = document.getElementById("root");
+      if (root && !window.__APP_MOUNTED__) {
+        root.innerHTML =
+          '<div style="max-width:680px;margin:40px auto;background:#fff;border:2px solid #ff4d2e;border-radius:16px;padding:24px;font-family:sans-serif;">' +
+          '<h2 style="color:#ff4d2e;margin:0 0 8px;">Lỗi khởi chạy ứng dụng</h2>' +
+          '<p style="margin:0 0 12px;font-size:14px;">Vui lòng kiểm tra kết nối Internet để tải thư viện React hoặc tải lại trang (F5).</p>' +
+          '<pre style="background:#f6f6f6;padding:12px;border-radius:8px;overflow:auto;font-size:12px;">' +
+          String(ev.message || ev.error || "Unknown error") +
+          '</pre></div>';
+      }
+    });
+  </script>
+
+  <!-- Tải React, ReactDOM & SheetJS với cơ chế dự phòng CDN kép -->
+  <script>
+    function loadScriptSequential(urls, onReady) {
+      function next(idx) {
+        if (idx >= urls.length) {
+          onReady();
+          return;
+        }
+        var pair = urls[idx];
+        var s = document.createElement("script");
+        s.src = pair[0];
+        s.onload = function () { next(idx + 1); };
+        s.onerror = function () {
+          if (pair[1]) {
+            var s2 = document.createElement("script");
+            s2.src = pair[1];
+            s2.onload = function () { next(idx + 1); };
+            s2.onerror = function () { next(idx + 1); };
+            document.head.appendChild(s2);
+          } else {
+            next(idx + 1);
+          }
+        };
+        document.head.appendChild(s);
+      }
+      next(0);
+    }
+
+    loadScriptSequential([
+      ["https://unpkg.com/react@18/umd/react.production.min.js", "https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"],
+      ["https://unpkg.com/react-dom@18/umd/react-dom.production.min.js", "https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"],
+      ["https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js", "https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"]
+    ], function () {
+      if (window.initTestOnlineMOS) window.initTestOnlineMOS();
+    });
+  </script>
+
+  <script>
+    window.initTestOnlineMOS = function () {
+      if (!window.React || !window.ReactDOM) {
+        document.getElementById("root").innerHTML =
+          '<div style="max-width:600px;margin:40px auto;background:#fff;border:2px solid #111;border-radius:16px;padding:24px;font-family:sans-serif;">' +
+          '<h2>Không tải được thư viện React</h2><p>Vui lòng kiểm tra kết nối mạng và nhấn F5 để tải lại trang.</p></div>';
+        return;
+      }
+
+      const h = React.createElement;
+      const { useState, useEffect, useMemo, useRef } = React;
+
+      // Thuật toán trộn ngẫu nhiên Fisher-Yates chuẩn xác suất đều
+      function fisherYatesShuffle(arr) {
+        const copy = arr.slice();
+        for (let i = copy.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          const temp = copy[i];
+          copy[i] = copy[j];
+          copy[j] = temp;
+        }
+        return copy;
+      }
+
+      // --- DỮ LIỆU NGƯỜI DÙNG MẪU ---
+      const INITIAL_USERS = [
+        { id_user: "SV001", mssv: "SV001", hoTen: "Nguyễn Văn An", lop: "MOS_K01", matKhau: "123", vaiTro: "sinhvien", mustChangePass: false },
+        { id_user: "SV002", mssv: "SV002", hoTen: "Trần Thị Bình", lop: "MOS_K01", matKhau: "123", vaiTro: "sinhvien", mustChangePass: false },
+        { id_user: "SV003", mssv: "SV003", hoTen: "Lê Hoàng Cường", lop: "MOS_K02", matKhau: "123", vaiTro: "sinhvien", mustChangePass: false },
+        { id_user: "SV004", mssv: "SV004", hoTen: "Phạm Minh Dung", lop: "MOS_K02", matKhau: "123", vaiTro: "sinhvien", mustChangePass: false },
+        { id_user: "admin", mssv: "admin", hoTen: "Quản Trị Viên MOS", lop: "ADMIN", matKhau: "admin123", vaiTro: "admin", mustChangePass: false },
+        { id_user: "gv001", mssv: "gv001", hoTen: "Giảng Viên Tin Học MOS", lop: "GV", matKhau: "123", vaiTro: "giaovien", mustChangePass: false, id_monhoc: "MOS_WORD" }
+      ];
+
+      const INITIAL_MONHOC = [
+        { id_monhoc: "MOS_WORD", ten_monhoc: "Microsoft Word (MOS Word)" },
+        { id_monhoc: "MOS_EXCEL", ten_monhoc: "Microsoft Excel (MOS Excel)" }
+      ];
+
+      const INITIAL_CHUONG = [
+        { id_chuong: "WORD_CA1", id_monhoc: "MOS_WORD", ten_chuong: "MOS Word - Ca Thi 1 (Câu 01 - 50)" },
+        { id_chuong: "WORD_CA2", id_monhoc: "MOS_WORD", ten_chuong: "MOS Word - Ca Thi 2 (Câu 51 - 100)" },
+        { id_chuong: "EXCEL_CA1", id_monhoc: "MOS_EXCEL", ten_chuong: "MOS Excel - Ca Thi 1 (Câu 01 - 50)" },
+        { id_chuong: "EXCEL_CA2", id_monhoc: "MOS_EXCEL", ten_chuong: "MOS Excel - Ca Thi 2 (Câu 51 - 100)" }
+      ];
+
+      // ==================== NGÂN HÀNG DỮ LIỆU WORD NÂNG CAO (100 CÂU: ĐÁP ÁN PHÂN BỔ ĐỀU A/B/C/D + TÌNH HUỐNG BẪY) ====================
+      const RAW_WORD_BANK = [
+        // --- CA 1: CÂU 1 - 50 ---
+        { topic: "Quản lý tài liệu", q: "Trong dự án chuẩn hóa báo cáo, bạn cần áp dụng bộ định dạng 'Lines (Distinctive)' cho toàn bộ tài liệu mà không làm thay đổi bảng màu Theme hiện tại. Thao tác nào chính xác?", opts: ["Home > Styles > Change Styles > Style Set > Lines (Distinctive)", "Design > Document Formatting > chọn Lines (Distinctive)", "Layout > Themes > Style Set > Lines (Distinctive)", "Design > Document Formatting > Themes > Lines (Distinctive)"], ans: 1, exp: "Thẻ Design > nhóm Document Formatting chứa thư viện Style Set; chọn trực tiếp Lines (Distinctive) sẽ giữ nguyên Theme Colors hiện tại." },
+        { topic: "Định dạng văn bản", q: "Để giãn khoảng cách giữa các ký tự (Character Spacing) của tiêu đề chính thành 'Expanded' mức 1.5 pt đồng thời bật tính năng tự động điều chỉnh cặp ký tự (Kerning) từ cỡ chữ 14 pt trở lên, bạn thiết lập ở đâu?", opts: ["Hộp thoại Paragraph > thẻ Indents and Spacing > Character Spacing", "Layout > Spacing > After/Before > nhập 1.5 pt", "Hộp thoại Font (Ctrl+D) > thẻ Advanced > Spacing: Expanded (1.5 pt) và tích Kerning for fonts: 14 pt", "Home > Line and Paragraph Spacing > Line Spacing Options"], ans: 2, exp: "Cả Character Spacing (Expanded/Condensed) và Kerning for fonts đều nằm trong hộp thoại Font > thẻ Advanced." },
+        { topic: "Chèn đối tượng", q: "Bạn cần chèn toàn bộ nội dung của tệp 'PhuLuc.docx' vào cuối trang 3 sao cho nội dung được nhúng thành văn bản thực (có thể sửa trực tiếp) thay vì liên kết động. Bạn chọn lệnh nào?", opts: ["Insert > Quick Parts > Field > chọn IncludeText", "File > Open > chọn PhuLuc.docx > Merge into Current Document", "References > Insert Caption > Import Text", "Insert > nhóm Text > mũi tên cạnh Object > Text from File"], ans: 3, exp: "Insert > Object > Text from File chèn trực tiếp nội dung của tệp khác vào tài liệu hiện hành tại vị trí con trỏ." },
+        { topic: "Quản lý trang", q: "Báo cáo gồm 10 trang dọc (Portrait), riêng trang 6 chứa bảng số liệu rộng cần xoay ngang (Landscape), và trang 7 quay lại khổ dọc. Bạn phải chèn tối thiểu bao nhiêu ngắt (Break) và thuộc loại nào?", opts: ["2 ngắt Section Break (Next Page): một ở cuối trang 5 và một ở cuối trang 6", "1 ngắt Page Break ở cuối trang 5 và 1 ngắt Continuous ở cuối trang 6", "2 ngắt Page Break (Ctrl + Enter) ở cuối trang 5 và cuối trang 6", "1 ngắt Section Break (Even Page) ở đầu trang 6"], ans: 0, exp: "Để tách riêng hướng giấy của trang 6 khỏi trang 5 và trang 7, cần 2 Section Break (Next Page) bao quanh trang 6." },
+        { topic: "Bảng biểu (Tables)", q: "Một bảng dài 4 trang đã bật 'Repeat Header Rows', nhưng khi sang trang 2 hàng tiêu đề vẫn KHÔNG lặp lại. Nguyên nhân phổ biến nhất trong bài thi MOS là gì?", opts: ["Hàng tiêu đề không phải là hàng đầu tiên của bảng hoặc giữa bảng có chèn ngắt trang thủ công (Page Break)", "Chưa bật tùy chọn Header Row trong thẻ Table Design", "Bảng đang bật chế độ AutoFit Contents", "Định dạng chữ trong hàng tiêu đề chưa dùng Style Heading 1"], ans: 0, exp: "Repeat Header Rows chỉ hoạt động khi hàng được chọn nằm ở đầu bảng (hàng 1 hoặc nhóm hàng liên tiếp từ hàng 1) và bảng không bị tách bằng Page Break thủ công." },
+        { topic: "Danh sách (Lists)", q: "Khi tạo danh sách đánh số thứ tự cho Phần II, Word tự động đánh số từ 1 thay vì nối tiếp số 6 từ Phần I. Ngoài chuột phải > Continue Numbering, cách nào cho phép ép danh sách bắt đầu chính xác từ số 6?", opts: ["Chuột phải vào số 1 > Set Numbering Value > chọn Start new list và nhập Set value to: 6", "Home > Numbering > Define New Number Format > gõ số 6", "Layout > Page Setup > Line Numbers > Restart Each Section", "Chuột phải vào số 1 > Adjust List Indents > nhập 6"], ans: 0, exp: "Set Numbering Value cho phép thiết lập chính xác giá trị số bắt đầu cho danh sách." },
+        { topic: "Tham chiếu (References)", q: "Tài liệu yêu cầu chuyển đổi toàn bộ các chú thích cuối trang (Footnotes) hiện có thành chú thích cuối tài liệu (Endnotes) chỉ bằng một thao tác hàng loạt. Bạn mở hộp thoại Footnote and Endnote và nhấn nút nào?", opts: ["Swap > Swap Footnotes and Endnotes", "Convert... > Convert all footnotes to endnotes", "Location > Move to End of Document", "Apply Changes > Migrate All"], ans: 1, exp: "Mở hộp thoại Footnote and Endnote (mũi tên góc nhóm Footnotes) > nhấn Convert... > chọn Convert all footnotes to endnotes." },
+        { topic: "Hình ảnh & Đồ họa", q: "Khi chèn ảnh logo nền trong suốt, bạn muốn chữ bao quanh sát theo đường viền thực tế của logo VÀ cho phép chữ lấp đầy cả những khoảng lõm bên trong đường bao ảnh. Bạn chọn chế độ Wrap Text nào?", opts: ["Square", "Tight", "Through", "In Line with Text"], ans: 2, exp: "Tight ôm sát đường bao ngoài của đối tượng; Through cho phép chữ tràn cả vào các vùng lõm/hở bên trong đường bao." },
+        { topic: "Kiểm tra & Bảo mật", q: "Sau khi chạy Document Inspector và nhấn 'Remove All' ở mục 'Document Properties and Personal Information', điều gì xảy ra nếu bạn lưu tệp và chỉnh sửa tiếp?", opts: ["Mọi thuộc tính ẩn, tên tác giả và đường dẫn mẫu bị xóa sạch; các lần lưu sau không tự động ghi lại tên tác giả cho tới khi tắt tùy chọn này", "Toàn bộ nội dung văn bản bị mã hóa bằng mật khẩu ngẫu nhiên", "Tất cả bình luận (Comments) được chuyển thành Footnote", "Tài liệu tự động chuyển sang chế độ Read-Only vĩnh viễn"], ans: 0, exp: "Document Inspector xóa vĩnh viễn siêu dữ liệu cá nhân (lưu ý không thể Undo sau khi Remove All)." },
+        { topic: "Header & Footer", q: "Tài liệu gồm 12 trang có số trang ở Footer. Bạn muốn trang 1 (trang bìa) không hiện số trang, và trang 2 bắt đầu đánh số từ số 1 (thay vì số 2). Bạn thiết lập thế nào?", opts: ["Bật Different First Page; vào Page Number > Format Page Numbers > đặt Start at: 0", "Chèn Section Break cuối trang 1; tắt Link to Previous; đặt Start at: 1 ở trang 2", "Bật Different Odd & Even Pages; xóa số trang ở trang 1", "Cả hai cách A và B đều cho ra kết quả đúng theo chuẩn MOS"], ans: 3, exp: "Nếu dùng Different First Page trên cùng 1 Section thì đặt Start at: 0 để trang 2 hiện số 1; nếu tách Section 2 thì ngắt Link to Previous và đặt Start at: 1." },
+        { topic: "SmartArt", q: "Trong sơ đồ SmartArt dạng phân cấp (Hierarchy), bạn muốn hạ cấp (giáng bậc) một khối đang ngang hàng với Trưởng phòng xuống làm nhân viên dưới quyền của khối ngay phía trên nó. Bạn dùng lệnh nào?", opts: ["SmartArt Design > nhóm Create Graphic > Demote", "SmartArt Design > nhóm Create Graphic > Promote", "SmartArt Design > Move Down", "SmartArt Design > Add Shape Below"], ans: 0, exp: "Demote hạ thấp 1 cấp độ trong cây phân cấp; Promote nâng cao 1 cấp độ." },
+        { topic: "Tìm kiếm & Thay thế", q: "Để tìm tất cả các từ có đúng 4 ký tự bắt đầu bằng 't' và kết thúc bằng 'n' (như 'toán', 'tiền', 'tuần') trong hộp thoại Find and Replace, bạn bật 'Use wildcards' và nhập gì vào ô Find what?", opts: ["t*n", "t??n", "<t??n>", "[t-n]{4}"], ans: 2, exp: "Khi bật Wildcards: dấu < đánh dấu đầu từ, > đánh dấu cuối từ, mỗi dấu ? đại diện cho đúng 1 ký tự bất kỳ." },
+        { topic: "Cột báo (Columns)", q: "Khi chia một đoạn văn bản ngắn thành 2 cột báo, toàn bộ chữ dồn hết sang cột 1 bên trái trong khi cột 2 trống trơn. Để cân bằng chiều dài nội dung hai cột đều nhau, bạn đặt con trỏ cuối đoạn văn và chèn loại ngắt nào?", opts: ["Layout > Breaks > Column", "Layout > Breaks > Continuous (Section Break)", "Insert > Page Break", "Layout > Breaks > Text Wrapping"], ans: 1, exp: "Chèn Continuous Section Break ngay cuối khối văn bản chia cột sẽ buộc Word tự động cân bằng độ dài các cột." },
+        { topic: "Siêu liên kết (Hyperlink)", q: "Khi tạo Bookmark trong Word, tên nào sau đây sẽ làm nút 'Add' bị vô hiệu hóa (mờ đi không nhấn được)?", opts: ["Muc_Luc_2026", "Chuong1", "Phan 1", "KetLuanCuoi"], ans: 2, exp: "Tên Bookmark trong Word phải bắt đầu bằng chữ cái và KHÔNG được chứa dấu cách (khoảng trắng)." },
+        { topic: "Bảng biểu (Tables)", q: "Bạn muốn cố định kích thước bảng sao cho khi gõ thêm văn bản dài vào một ô, cột KHÔNG tự động giãn rộng ra làm vỡ bố cục trang mà tự động xuống dòng trong ô đó. Bạn chọn thiết lập nào?", opts: ["Table Tools Layout > AutoFit > Fixed Column Width", "Table Tools Layout > AutoFit > AutoFit Contents", "Table Tools Layout > Distribute Columns", "Table Properties > Cell > Fit text"], ans: 0, exp: "Fixed Column Width khóa cố định độ rộng cột hiện tại, buộc văn bản dài tự động ngắt dòng xuống dưới." },
+        { topic: "Mục lục tự động", q: "Tài liệu sử dụng các Style tùy chỉnh tên là 'Chuong_Chinh' (cấp 1) và 'Muc_Nho' (cấp 2) thay cho Heading 1, Heading 2. Làm sao để Mục lục tự động nhận diện được hai Style này?", opts: ["References > Table of Contents > Custom Table of Contents > nút Options... > gán TOC level 1 và 2 cho hai Style này", "Đổi tên hai Style thành Heading 1 và Heading 2", "Bôi đen từng tiêu đề và nhấn Alt + Shift + O", "Insert > Quick Parts > Table of Contents > Map Styles"], ans: 0, exp: "Trong Custom Table of Contents > Options..., bạn có thể ánh xạ bất kỳ Style tùy chỉnh nào sang cấp độ TOC level 1..9." },
+        { topic: "Định dạng đoạn văn", q: "Để một đoạn văn bản quan trọng luôn tự động nhảy sang đầu trang mới mà không cần phải nhấn Enter nhiều lần hay chèn Page Break thủ công, bạn bật thuộc tính nào?", opts: ["Paragraph > thẻ Line and Page Breaks > Page break before", "Paragraph > thẻ Line and Page Breaks > Keep lines together", "Paragraph > thẻ Indents and Spacing > Widow/Orphan control", "Layout > Breaks > Next Page"], ans: 0, exp: "Thuộc tính Page break before gắn liền với đoạn văn đó, đảm bảo đoạn luôn bắt đầu ở đầu trang mới." },
+        { topic: "Hiệu ứng chữ", q: "Khi tạo Drop Cap kiểu 'In margin', chữ cái lớn đầu đoạn sẽ hiển thị ở vị trí nào so với phần văn bản còn lại của đoạn?", opts: ["Nằm hoàn toàn bên ngoài vùng lề trái (lề trắng của trang giấy), tách biệt khỏi khối chữ chính", "Nằm lọt bên trong vùng lề văn bản với các dòng chữ ôm bên phải", "Nằm trên một dòng riêng biệt phía trên đoạn văn", "Nằm chìm làm nền phía sau đoạn văn"], ans: 0, exp: "Dropped đặt chữ cái lớn trong lề văn bản; In margin đẩy chữ cái lớn ra ngoài lề trái trang giấy." },
+        { topic: "Theo dõi thay đổi", q: "Khi bật Track Changes, trên lề trái xuất hiện một vạch dọc màu đỏ (Change Bar) nhưng không hiển thị chi tiết nội dung bị xóa hay thêm. Chế độ Display for Review nào đang được bật?", opts: ["All Markup", "Simple Markup", "No Markup", "Original"], ans: 1, exp: "Simple Markup chỉ hiển thị vạch đỏ ở lề trái báo hiệu dòng có chỉnh sửa; nhấp vào vạch đỏ sẽ chuyển sang All Markup." },
+        { topic: "Trích dẫn & Thư mục", q: "Sau khi chèn trích dẫn '(Nguyễn, 2026)', đề bài yêu cầu bổ sung số trang trích dẫn 'tr. 45' và ẩn tên tác giả đi vì đã nhắc tên tác giả trong câu văn. Bạn thực hiện thế nào?", opts: ["Nhấp vào trích dẫn > mũi tên thả xuống > Edit Citation > nhập Pages: 45 và tích chọn Author", "Gõ trực tiếp chữ 'tr. 45' vào bên trong khung trích dẫn", "References > Manage Sources > Edit > thêm số trang", "Chuyển trích dẫn sang văn bản tĩnh (Convert citation to static text)"], ans: 0, exp: "Edit Citation cho phép nhập số trang (Pages) và tích chọn Suppress (ẩn) Author, Year hoặc Title." },
+        { topic: "Nền trang (Page Background)", q: "Khi chèn Watermark tùy chỉnh (Custom Watermark) bằng văn bản, tùy chọn 'Semitransparent' có tác dụng gì?", opts: ["Làm mờ chữ Watermark đi 50% để không che khuất nội dung chữ chính bên trên", "Xoay chữ Watermark nghiêng một góc 45 độ", "Chỉ hiển thị Watermark ở trang đầu tiên", "Biến chữ Watermark thành hình ảnh vector"], ans: 0, exp: "Semitransparent tạo độ trong suốt mờ cho Watermark nhằm đảm bảo văn bản chính vẫn dễ đọc." },
+        { topic: "Thuộc tính tài liệu", q: "Để chèn trường thông tin 'Author' (Tên tác giả từ File > Info) vào vị trí con trỏ trong văn bản sao cho khi đổi tên tác giả ở Info thì văn bản cũng tự cập nhật, bạn chọn lệnh nào?", opts: ["Insert > Quick Parts > Document Property > Author", "Insert > Text Box > Author Info", "References > Insert Citation > Author", "Design > Document Formatting > Author"], ans: 0, exp: "Insert > Quick Parts > Document Property chèn các trường siêu dữ liệu động liên kết hai chiều với File > Info." },
+        { topic: "Bảng biểu (Tables)", q: "Để chia một ô đang chọn trong bảng thành 2 cột và 3 hàng (tổng 6 ô nhỏ) mà không ảnh hưởng đến các hàng khác, bạn chọn lệnh nào?", opts: ["Layout (Table Tools) > nhóm Merge > Split Cells > nhập Number of columns: 2, Number of rows: 3", "Layout (Table Tools) > nhóm Merge > Split Table", "Table Design > Draw Table", "Layout (Table Tools) > Distribute Rows & Columns"], ans: 0, exp: "Split Cells chia tách các ô đang chọn theo số cột và số hàng chỉ định." },
+        { topic: "Hình ảnh & Đồ họa", q: "Sau khi cắt xén (Crop) một bức ảnh, bạn nhận thấy chủ thể bên trong bị lệch sang trái khung cắt. Làm thế nào để dịch chuyển phần ảnh bên trong mà giữ nguyên vị trí khung cắt trên trang?", opts: ["Nhấn nút Crop, sau đó kéo phần hình ảnh màu mờ bên trong khung cắt (không kéo các thanh đen ở viền)", "Dùng công cụ Position trên thẻ Picture Format", "Nhấn Reset Picture & Size", "Đổi chế độ Wrap Text sang Behind Text"], ans: 0, exp: "Khi công cụ Crop đang kích hoạt, kéo bên trong ảnh sẽ di chuyển vùng ảnh hiển thị bên dưới khung cắt cố định." },
+        { topic: "Chữ nghệ thuật", q: "Để xóa bỏ toàn bộ hiệu ứng đổ bóng, phát sáng (Glow) và phản chiếu (Reflection) của một đối tượng WordArt nhưng vẫn giữ nguyên nội dung chữ và phông chữ, bạn nhấn nút nào?", opts: ["Shape Format > WordArt Styles > Clear WordArt", "Home > Clear All Formatting", "Shape Format > Text Effects > No Shadow", "Picture Format > Reset Picture"], ans: 0, exp: "Trong thư viện Quick Styles của WordArt Styles có tùy chọn Clear WordArt ở dưới cùng." },
+        { topic: "Bảng biểu (Tables)", q: "Trong bảng Word gồm 4 cột (Sản phẩm, Số lượng, Đơn giá, Thành tiền), tại ô D2 bạn muốn tính tích của Số lượng (B2) và Đơn giá (C2) với định dạng tiền tệ '#,##0'. Công thức đúng trong hộp thoại Formula là gì?", opts: ["=B2*C2 (Number format: #,##0)", "=PRODUCT(LEFT) (Number format: #,##0)", "=MULTIPLY(B2, C2)", "Cả A và B đều cho kết quả chính xác trong Word Table"], ans: 3, exp: "Word Table hỗ trợ cả tham chiếu tọa độ ô kiểu Excel (=B2*C2) lẫn từ khóa hướng (=PRODUCT(LEFT))." },
+        { topic: "Kiểm tra tài liệu", q: "Khi công cụ Accessibility Checker báo lỗi 'Missing Alternative Text' cho một biểu đồ hoặc hình ảnh trang trí thuần túy (không mang thông tin nội dung), cách xử lý chuẩn xác nhất theo MOS là gì?", opts: ["Mở ngăn Alt Text và tích chọn ô 'Mark as decorative'", "Xóa bỏ hình ảnh đó khỏi tài liệu", "Nhập dấu cách vào ô mô tả Alt Text", "Chuyển hình ảnh sang định dạng JPEG"], ans: 0, exp: "Đánh dấu 'Mark as decorative' báo cho trình đọc màn hình (Screen Reader) bỏ qua các hình ảnh chỉ mang tính trang trí." },
+        { topic: "Tab dừng (Tabs)", q: "Ký hiệu chữ 'T' ngược (⊥) trên thanh thước ngang (Ruler) biểu thị loại điểm dừng Tab nào?", opts: ["Left Tab", "Center Tab", "Right Tab", "Decimal Tab"], ans: 1, exp: "Chữ L là Left Tab; chữ T ngược (⊥) là Center Tab; chữ L ngược là Right Tab; chữ T ngược có dấu chấm là Decimal Tab." },
+        { topic: "Lưu trữ & Xuất bản", q: "Khi xuất tài liệu Word sang PDF qua File > Export > Create PDF/XPS, nếu muốn các tiêu đề Heading 1, Heading 2 tự động trở thành thanh điều hướng Bookmark trong trình đọc PDF, bạn nhấn nút 'Options...' và tích chọn mục nào?", opts: ["Create bookmarks using: Headings", "Document properties", "PDF/A compliant", "Optimize for: Minimum size"], ans: 0, exp: "Trong hộp thoại Options của xuất PDF, tích chọn 'Create bookmarks using: Headings' giúp tạo cây mục lục điều hướng trong file PDF." },
+        { topic: "Định dạng đoạn văn", q: "Định dạng thụt lề 'Hanging Indent' (thụt lề treo — dòng đầu sát lề trái, các dòng sau thụt vào trong) thường được dùng chuẩn mực nhất cho thành phần nào?", opts: ["Danh mục tài liệu tham khảo (Bibliography / Works Cited)", "Tiêu đề chính của báo cáo", "Chữ ký cuối thư", "Nội dung bên trong ô của bảng"], ans: 0, exp: "Hanging Indent là quy chuẩn trình bày của trích dẫn tài liệu tham khảo theo chuẩn APA, MLA, IEEE." },
+        { topic: "Danh sách (Lists)", q: "Để liên kết từng cấp độ (Level 1, Level 2, Level 3) của một danh sách đa cấp với các Style tương ứng (Heading 1, Heading 2, Heading 3) nhằm đánh số chương mục tự động toàn bài, bạn dùng hộp thoại nào?", opts: ["Home > Multilevel List > Define New Multilevel List > nhấn More >> > mục Link level to style", "Manage Styles > Set Defaults", "References > Table of Contents > Custom", "Home > Styles > Modify Style > Numbering"], ans: 0, exp: "Define New Multilevel List > More >> > Link level to style là kỹ thuật chuẩn để đánh số tự động cho hệ thống Heading." },
+        { topic: "Bảng biểu (Tables)", q: "Khi sắp xếp một cột chứa dữ liệu dạng ngày tháng (ví dụ: 25/12/2026, 05/01/2026) trong bảng Word, bạn phải chọn giá trị nào ở mục 'Type' trong hộp thoại Sort để sắp xếp đúng thứ tự thời gian?", opts: ["Text", "Number", "Date", "Chronological"], ans: 2, exp: "Chọn Type: Date giúp Word hiểu đúng giá trị ngày tháng thay vì sắp xếp theo thứ tự bảng chữ cái (Text)." },
+        { topic: "Chèn đối tượng", q: "Để liên kết hai hộp văn bản (Text Box) rỗng với nhau sao cho khi văn bản gõ đầy hộp thứ nhất sẽ tự động tràn sang hộp thứ hai giống như cột báo, bạn chọn hộp thứ nhất và nhấn nút nào?", opts: ["Shape Format > nhóm Text > Create Link", "Insert > Links > Cross-reference", "Layout > Arrange > Group", "Shape Format > Wrap Text > Through"], ans: 0, exp: "Tính năng Create Link kết nối luồng văn bản liên tục giữa các Text Box." },
+        { topic: "Quản lý trang", q: "Khi tài liệu sử dụng thiết lập lề 'Mirrored' hoặc bật 'Different Odd & Even Pages', tên gọi của lề trái trên trang lẻ và lề phải trên trang chẵn (phần gáy đóng sách) là gì?", opts: ["Inside margin", "Outside margin", "Gutter margin", "Binding margin"], ans: 0, exp: "Khi bật Mirrored margins, Left và Right đổi tên thành Inside (lề trong giáp gáy) và Outside (lề ngoài)." },
+        { topic: "Tham chiếu (References)", q: "Nếu bạn chèn thêm một hình ảnh mới vào trang 2 và gắn Caption cho nó, các số thứ tự Caption của các hình ở trang 3, 4 không tự động nhảy số ngay lập tức. Làm thế nào để cập nhật toàn bộ số thứ tự Caption trong tài liệu?", opts: ["Nhấn Ctrl + A để chọn toàn bộ văn bản, sau đó nhấn phím F9", "Vào References > Update Table", "Lưu tệp và đóng Word rồi mở lại", "Nhấn phím F5"], ans: 0, exp: "Số thứ tự Caption là trường SEQ Field; bôi đen toàn bài (Ctrl + A) và nhấn F9 sẽ cập nhật tất cả các trường." },
+        { topic: "Hiệu chỉnh văn bản", q: "Sự khác biệt giữa phím tắt Ctrl + Spacebar và Ctrl + Shift + N khi định dạng văn bản là gì?", opts: ["Ctrl + Spacebar chỉ xóa định dạng ký tự trực tiếp; Ctrl + Shift + N đưa đoạn văn về Style 'Normal'", "Ctrl + Spacebar xóa cả văn bản; Ctrl + Shift + N tạo tài liệu mới", "Hai phím tắt này có chức năng giống hệt nhau", "Ctrl + Spacebar căn đều hai bên; Ctrl + Shift + N đánh số thứ tự"], ans: 0, exp: "Ctrl + Spacebar = Clear Character Formatting; Ctrl + Shift + N = Apply Normal Style." },
+        { topic: "Hình ảnh & Đồ họa", q: "Khi sử dụng công cụ 'Remove Background' trên thẻ Picture Format, vùng màu tím (Magenta) phủ lên bức ảnh có ý nghĩa gì?", opts: ["Vùng sẽ bị xóa bỏ (trở thành trong suốt) sau khi nhấn Keep Changes", "Vùng sẽ được giữ lại nguyên vẹn", "Vùng đang bị lỗi độ phân giải thấp", "Vùng sẽ được chuyển thành màu đen trắng"], ans: 0, exp: "Màu tím biểu thị vùng bị loại bỏ; dùng Mark Areas to Keep (+) để giữ lại chi tiết bị tô tím nhầm." },
+        { topic: "Quản lý tài liệu", q: "Để lưu các thay đổi về phông chữ mặc định (ví dụ: Times New Roman, 13 pt) cho mọi tài liệu mới tạo ra sau này từ mẫu Normal.dotm, bạn nhấn nút nào trong hộp thoại Font?", opts: ["Set As Default > chọn 'All documents based on the Normal.dotm template'", "OK > Save Theme", "Manage Styles > Import/Export", "File > Options > Save as Default"], ans: 0, exp: "Set As Default > chọn tùy chọn thứ hai ('All documents based on the Normal template') sẽ lưu vĩnh viễn vào Normal.dotm." },
+        { topic: "Chèn đối tượng", q: "Phím tắt mặc định của Word để chèn nhanh ký hiệu Bản quyền © (Copyright) khi đang gõ văn bản là gì?", opts: ["Gõ (c) rồi nhấn dấu cách hoặc nhấn Alt + Ctrl + C", "Nhấn Ctrl + Shift + C", "Gõ [c] rồi nhấn Enter", "Nhấn Alt + C"], ans: 0, exp: "AutoCorrect tự động chuyển (c) thành ©, (r) thành ®, (tm) thành ™." },
+        { topic: "Bảo mật tài liệu", q: "Trong ngăn 'Restrict Editing', sau khi chọn 'Allow only this type of editing in the document: No changes (Read only)', bạn bôi đen một đoạn văn bản và tích chọn 'Everyone' ở mục Exceptions. Điều này có tác dụng gì?", opts: ["Khóa toàn bộ tài liệu không cho sửa, NGOẠI TRỪ đoạn văn bản được bôi đen đó mọi người đều có thể chỉnh sửa", "Chỉ cho phép mọi người đọc đoạn văn đó còn các phần khác bị ẩn", "Xóa quyền chỉnh sửa của tất cả mọi người đối với đoạn văn đó", "Yêu cầu nhập mật khẩu riêng khi nhấp vào đoạn văn đó"], ans: 0, exp: "Tính năng Exceptions trong Restrict Editing cho phép mở khóa cục bộ những vùng được chỉ định trên nền tài liệu bị khóa." },
+        { topic: "Định dạng văn bản", q: "Tổ hợp phím tắt nào chuyển đổi nhanh qua lại giữa chữ thường, chữ hoa đầu câu và CHỮ IN HOA TOÀN BỘ cho văn bản đang chọn?", opts: ["Shift + F3", "Ctrl + Shift + A", "Alt + F3", "Ctrl + F3"], ans: 0, exp: "Shift + F3 xoay vòng giữa lowercase, Sentence case và UPPERCASE." },
+        { topic: "Bảng biểu (Tables)", q: "Khi con trỏ đang nằm ở ô cuối cùng bên phải của hàng cuối cùng trong một bảng Word, nhấn phím gì sẽ tự động tạo thêm một hàng mới ở đáy bảng?", opts: ["Tab", "Enter", "Shift + Tab", "Ctrl + Enter"], ans: 0, exp: "Nhấn Tab tại ô cuối cùng của bảng sẽ tự động chèn thêm một hàng mới có cùng định dạng." },
+        { topic: "Tự động hóa", q: "Để chèn nhanh một đoạn văn bản mẫu ngẫu nhiên gồm 5 đoạn, mỗi đoạn 4 câu nhằm thử nghiệm bố cục trang trong Word, bạn gõ cú pháp nào đầu dòng rồi nhấn Enter?", opts: ["=rand(5,4)", "=lorem(4,5)", "=text(5,4)", "=sample(5,4)"], ans: 0, exp: "=rand(p,s) tạo p đoạn văn với s câu mỗi đoạn; =lorem(p,s) tạo văn bản giả Lorem Ipsum." },
+        { topic: "Bình luận (Comments)", q: "Khi in tài liệu hoặc xuất sang PDF, nếu bạn KHÔNG muốn hiển thị các khung bình luận (Comments) ở lề phải trang giấy, bạn tắt tùy chọn nào?", opts: ["File > Print > mục Settings > nhấp Print All Pages > bỏ tích 'Print Markup'", "Review > Delete All Comments in Document", "View > bỏ tích Reviewing Pane", "Design > Page Setup > Hide Comments"], ans: 0, exp: "Bỏ tích 'Print Markup' trong thiết lập in giúp in văn bản sạch mà không cần xóa bình luận." },
+        { topic: "Định dạng trang", q: "Khi tạo đường viền trang (Page Border), làm thế nào để đường viền ôm sát vào khung văn bản (Text) thay vì nằm sát mép ngoài cùng của trang giấy (Edge of page)?", opts: ["Hộp thoại Borders and Shading > thẻ Page Border > nhấn nút Options... > đổi Measure from thành 'Text'", "Đổi Style đường viền sang kiểu 3-D", "Chọn Apply to: This section - First page only", "Giảm độ rộng Width xuống 1/2 pt"], ans: 0, exp: "Nút Options... trong thẻ Page Border cho phép đo khoảng cách từ mép giấy (Edge of page) hoặc từ lề văn bản (Text)." },
+        { topic: "Tham chiếu (References)", q: "Trong tài liệu có cả 'Hình' (Figure) và 'Bảng' (Table) đều được gắn Caption. Khi chèn Danh mục bảng biểu (Insert Table of Figures), bạn chọn thông số nào để chỉ liệt kê các Bảng mà không lẫn Hình?", opts: ["Caption label: Bảng (hoặc Table)", "Include label and number", "Formats: From template", "Modify... > Style: Table Caption"], ans: 0, exp: "Mục Caption label lọc chính xác nhãn đối tượng (Hình, Bảng, Equation) cần tổng hợp danh mục." },
+        { topic: "Bố cục & Hiển thị", q: "Trong ngăn điều hướng Navigation Pane (Ctrl + F), thẻ nào cho phép bạn kéo thả để thay đổi vị trí cả một chương lớn (gồm tiêu đề Heading và toàn bộ nội dung bên dưới nó)?", opts: ["Headings", "Pages", "Results", "Outline"], ans: 0, exp: "Thẻ Headings trong Navigation Pane hiển thị cấu trúc cây tiêu đề và hỗ trợ kéo thả sắp xếp lại vị trí các phần." },
+        { topic: "Quản lý đối tượng", q: "Khi nhiều hình khối (Shapes) bị xếp chồng lên nhau khiến bạn không thể nhấp chuột chọn được hình nằm dưới cùng, ngoài Selection Pane, bạn có thể nhấn phím nào sau khi chọn một hình bất kỳ để nhảy lần lượt qua từng đối tượng?", opts: ["Phím Tab", "Phím Ctrl", "Phím Alt", "Phím Spacebar"], ans: 0, exp: "Sau khi chọn một đối tượng đồ họa, nhấn phím Tab (hoặc Shift + Tab) sẽ tuần tự chọn các đối tượng tiếp theo trên trang." },
+        { topic: "Trộn thư (Mail Merge)", q: "Trong Mail Merge, khi dữ liệu ngày sinh hoặc số tiền lấy từ tệp Excel sang Word bị mất định dạng (ví dụ: 15000000 thay vì 15,000,000), bạn cần thêm mã chuyển đổi (Field Switch) nào vào bên trong trường trộn (nhấn Alt + F9)?", opts: ["\\# \"#,##0\"", "\\@ \"dd/MM/yyyy\"", "\\* Upper", "\\b \"VNĐ\""], ans: 0, exp: "Switch \\# định dạng số (numeric picture switch); Switch \\@ định dạng ngày tháng." },
+        { topic: "Trộn thư (Mail Merge)", q: "Để chèn câu điều kiện tự động trong Mail Merge (ví dụ: nếu Giới tính là 'Nam' thì hiện 'Ông', ngược lại hiện 'Bà'), bạn sử dụng công cụ nào trên thẻ Mailings?", opts: ["Rules > If...Then...Else...", "Greeting Line > Custom", "Match Fields", "Insert Merge Field > Conditional"], ans: 0, exp: "Mailings > nhóm Write & Insert Fields > Rules > If...Then...Else... tạo trường điều kiện động." },
+
+        // --- CA 2: CÂU 51 - 100 ---
+        { topic: "Quản lý tài liệu", q: "Để đặt thời gian tự động lưu bản sao khôi phục (AutoRecover) xuống mức ngắn nhất là 1 phút nhằm giảm thiểu mất dữ liệu khi mất điện, bạn thiết lập ở đâu?", opts: ["File > Options > Save > Save AutoRecover information every: 1 minutes", "File > Info > Manage Document > AutoSave Settings", "File > Options > Advanced > Save", "Review > Track Changes > AutoSave Interval"], ans: 0, exp: "File > Options > Save cho phép chỉnh khoảng thời gian AutoRecover từ 1 đến 120 phút." },
+        { topic: "Định dạng văn bản", q: "Để sao chép định dạng văn bản bằng phím tắt (không dùng chuột nhấp Format Painter), tổ hợp phím nào dùng để lấy định dạng và dán định dạng?", opts: ["Ctrl + Shift + C để lấy định dạng; Ctrl + Shift + V để dán định dạng", "Ctrl + Alt + C để lấy định dạng; Ctrl + Alt + V để dán định dạng", "Ctrl + C để lấy định dạng; Ctrl + Shift + V để dán định dạng", "Alt + Shift + C để lấy định dạng; Alt + Shift + V để dán định dạng"], ans: 0, exp: "Ctrl + Shift + C sao chép định dạng; Ctrl + Shift + V áp dụng định dạng đã sao chép." },
+        { topic: "Tìm kiếm & Thay thế", q: "Để tìm tất cả các chữ số bất kỳ và đóng khung chúng trong dấu ngoặc vuông (ví dụ: biến '2026' thành '[2026]'), bạn nhập gì vào ô Find what và Replace with (không bật Wildcards)?", opts: ["Find what: ^#  |  Replace with: [^&]", "Find what: ^$  |  Replace with: [^&]", "Find what: [0-9]  |  Replace with: [\\1]", "Find what: ^?  |  Replace with: [^?]"], ans: 0, exp: "^# đại diện cho một chữ số bất kỳ (Any Digit), còn ^& trong ô Replace with đại diện cho toàn bộ chuỗi vừa tìm thấy (Find What Text)." },
+        { topic: "Chèn đối tượng", q: "Khi vẽ một đường thẳng bằng công cụ Shapes > Line, làm thế nào để đảm bảo đường thẳng nằm ngang tuyệt đối (góc 0 độ) hoặc thẳng đứng 90 độ?", opts: ["Giữ phím Shift trong khi kéo chuột vẽ", "Giữ phím Ctrl trong khi kéo chuột vẽ", "Giữ phím Alt trong khi kéo chuột vẽ", "Bật Gridlines trên thẻ View"], ans: 0, exp: "Giữ phím Shift khóa góc vẽ theo bội số của 45 độ (0°, 45°, 90°)." },
+        { topic: "Định dạng đoạn văn", q: "Sự khác biệt giữa 'Widow/Orphan control' và 'Keep lines together' trong thẻ Line and Page Breaks là gì?", opts: ["Widow/Orphan control chỉ ngăn 1 dòng đơn lẻ nằm đầu/cuối trang; Keep lines together giữ toàn bộ đoạn văn không bị ngắt sang trang khác", "Hai tùy chọn này hoàn toàn giống nhau", "Widow/Orphan control áp dụng cho bảng; Keep lines together áp dụng cho ảnh", "Keep lines together chỉ giữ 2 dòng đầu tiên của đoạn"], ans: 0, exp: "Widow/Orphan cho phép ngắt đoạn miễn là có ít nhất 2 dòng ở mỗi trang; Keep lines together cấm ngắt đoạn." },
+        { topic: "Bảng biểu (Tables)", q: "Khi dùng lệnh 'Convert Text to Table' cho một danh sách có 4 cột phân cách bằng dấu phẩy, nhưng kết quả tạo ra lại có tới 6 cột do một số ô chứa dấu phẩy trong nội dung. Cách khắc phục chuẩn xác nhất là gì?", opts: ["Thay dấu phẩy phân cách cột bằng dấu Tab (hoặc chấm phẩy ;) trước khi chuyển đổi, sau đó chọn Separate text at: Tabs", "Chọn AutoFit to contents trong hộp thoại Convert Text to Table", "Tăng Number of columns lên 6 rồi gộp ô thủ công", "Đặt dấu ngoặc kép bao quanh các từ có dấu phẩy"], ans: 0, exp: "Sử dụng ký tự phân tách duy nhất không xuất hiện trong dữ liệu (như Tab) giúp tách cột chính xác 100%." },
+        { topic: "Bảng biểu (Tables)", q: "Khi xoay chữ dọc trong ô tiêu đề bảng bằng 'Text Direction', nội dung chữ bị dính sát vào đường viền trên và dưới của ô. Bạn chỉnh lề bên trong ô ở đâu?", opts: ["Layout (Table Tools) > nhóm Alignment > Cell Margins > chỉnh Top và Bottom", "Home > Paragraph > Line Spacing", "Table Design > Borders > Border Padding", "Layout > Page Setup > Margins"], ans: 0, exp: "Cell Margins điều chỉnh khoảng cách đệm (Top, Bottom, Left, Right) bên trong từng ô của bảng." },
+        { topic: "Hình ảnh & Đồ họa", q: "Khi sử dụng 'Compress Pictures', nếu bạn BỎ TÍCH ô 'Apply only to this picture' và TÍCH CHỌN ô 'Delete cropped areas of pictures', điều gì sẽ xảy ra?", opts: ["Tất cả hình ảnh trong toàn bộ tài liệu đều được nén và phần ảnh thừa bị cắt xén sẽ bị xóa vĩnh viễn khỏi tệp", "Chỉ ảnh đang chọn bị nén, các ảnh khác giữ nguyên", "Vùng ảnh đã cắt được khôi phục lại kích thước ban đầu", "Tài liệu tự động xuất sang định dạng PDF"], ans: 0, exp: "Bỏ tích 'Apply only to this picture' áp dụng thao tác nén cho toàn bộ ảnh trong tài liệu, giúp giảm mạnh dung lượng file." },
+        { topic: "SmartArt", q: "Để chuyển đổi một sơ đồ SmartArt hiện có thành các hình khối cơ bản độc lập (Shapes) để tự do chỉnh sửa từng thành phần mà không bị ràng buộc bởi bố cục SmartArt, bạn nhấn nút nào?", opts: ["SmartArt Design > nhóm Reset > Convert > Convert to Shapes", "SmartArt Design > Reset Graphic", "Format > Ungroup", "Home > Convert to Shapes"], ans: 0, exp: "SmartArt Design > Convert > Convert to Shapes phân rã SmartArt thành nhóm các Shape thông thường." },
+        { topic: "Liên kết & Tham chiếu", q: "Khi chèn Cross-reference tới một tiêu đề 'Chương 2: Phương pháp nghiên cứu', nếu bạn chỉ muốn hiển thị số trang của chương đó (ví dụ: '15') thay vì toàn bộ tên tiêu đề, bạn chọn gì ở mục 'Insert reference to'?", opts: ["Page number", "Heading text", "Heading number", "Above/below"], ans: 0, exp: "Mục 'Insert reference to' cho phép chọn hiển thị Heading text, Page number, Heading number, Above/below..." },
+        { topic: "Header & Footer", q: "Tài liệu có 3 Section. Bạn muốn xóa sạch nội dung Footer của Section 3 mà KHÔNG làm mất nội dung Footer của Section 1 và Section 2. Bạn phải làm gì trước khi xóa?", opts: ["Đặt con trỏ ở Footer Section 3, tắt nút 'Link to Previous', sau đó mới xóa nội dung Footer Section 3", "Bật Different First Page ở Section 3 rồi xóa", "Xóa Footer của Section 1 trước", "Nhấn Ctrl + Z sau khi xóa Footer"], ans: 0, exp: "Nếu không tắt Link to Previous, việc xóa Footer ở Section 3 sẽ xóa dây chuyền ngược lên cả Section 2 và Section 1." },
+        { topic: "Mục lục tự động", q: "Để loại bỏ đường chấm chấm dẫn hướng (Tab leader) giữa tên tiêu đề và số trang trong Mục lục tự động (để khoảng trắng trơn), bạn thiết lập tại đâu?", opts: ["Custom Table of Contents > mục Tab leader > chọn (none)", "Hộp thoại Paragraph > Tabs > Clear All", "Design > Document Formatting > Style Set", "Modify TOC Style > Clear Formatting"], ans: 0, exp: "Trong hộp thoại Table of Contents (Custom), mục Tab leader cho phép chọn (none), dấu chấm, gạch ngang hoặc gạch liền." },
+        { topic: "Bảng tra cứu (Index)", q: "Sau khi đánh dấu mục từ bằng 'Mark Entry', văn bản xuất hiện các ký tự lạ như '{ XE \"Phần mềm\" }' kèm ký hiệu Show/Hide ¶ tự động bật. Làm thế nào để ẩn các mã trường XE này đi?", opts: ["Tắt nút Show/Hide ¶ trên thẻ Home (hoặc nhấn Ctrl + *)", "Xóa các cụm { XE ... } bằng phím Delete", "Nhấn Alt + F9", "Vào Review > No Markup"], ans: 0, exp: "Mã trường XE được định dạng ẩn (Hidden text); chỉ cần tắt Show/Hide ¶ là các mã này sẽ biến mất." },
+        { topic: "Kiểm tra & Tương thích", q: "Công cụ 'Check Compatibility' (File > Info > Check for Issues > Check Compatibility) giúp người dùng nhận biết điều gì?", opts: ["Các tính năng mới trong tài liệu hiện tại sẽ bị mất hoặc chuyển thành dạng tĩnh khi lưu sang định dạng Word cũ (.doc)", "Các lỗi chính tả tiếng Việt chưa có trong từ điển", "Các liên kết trang web bị hỏng trong tài liệu", "Mức độ tương thích với màn hình điện thoại"], ans: 0, exp: "Check Compatibility liệt kê các tính năng không được hỗ trợ ở các phiên bản Word 97-2003, Word 2007, 2010..." },
+        { topic: "Chèn đối tượng", q: "Để lưu một đoạn văn bản kèm bảng biểu thường dùng (như khung chữ ký Giám đốc) thành một mục tái sử dụng nhanh trong thư viện AutoText, bạn chọn khối nội dung đó và nhấn tổ hợp phím nào?", opts: ["Alt + F3", "Ctrl + F3", "Shift + F3", "Alt + Shift + F3"], ans: 0, exp: "Alt + F3 mở hộp thoại Create New Building Block để lưu nội dung vào thư viện AutoText / Quick Parts." },
+        { topic: "Định dạng văn bản", q: "Tùy chọn 'tOGGLE cASE' trong nút Change Case thực hiện chức năng gì?", opts: ["Đảo ngược trạng thái hoa/thường của từng ký tự (chữ hoa thành chữ thường và chữ thường thành chữ hoa)", "Viết hoa chữ cái đầu mỗi từ", "Viết hoa chữ cái đầu câu", "Chuyển toàn bộ thành chữ in thường"], ans: 0, exp: "tOGGLE cASE đảo ngược hoa/thường — rất hữu ích khi lỡ bật Caps Lock lúc gõ văn bản." },
+        { topic: "Quản lý trang", q: "Để đánh số trang bằng chữ số La Mã thường (i, ii, iii...) cho phần Lời nói đầu (Section 1) và đánh số Ả Rập (1, 2, 3...) cho phần Nội dung chính (Section 2), bạn thiết lập ở đâu?", opts: ["Insert > Page Number > Format Page Numbers > mục Number format", "Home > Numbering > Roman Numerals", "Layout > Page Setup > Numbering Style", "Design > Page Number Format"], ans: 0, exp: "Format Page Numbers cho phép chọn kiểu số (1, 2, 3; a, b, c; i, ii, iii) độc lập cho từng Section." },
+        { topic: "Hình ảnh & Đồ họa", q: "Khi chọn 3 đối tượng đồ họa và nhấn 'Align Center', nhưng cả 3 đối tượng lại nhảy ra chính giữa trang giấy thay vì căn thẳng hàng với nhau. Nguyên nhân là gì?", opts: ["Đang bật tùy chọn 'Align to Page' hoặc 'Align to Margin' thay vì 'Align Selected Objects'", "Ba đối tượng chưa được Group lại với nhau", "Chế độ Wrap Text đang là In Line with Text", "Thước kẻ Ruler đang bị ẩn"], ans: 0, exp: "Align Selected Objects căn chỉnh các đối tượng dựa theo đối tượng ngoài cùng trong nhóm được chọn; Align to Margin/Page căn theo lề/trang." },
+        { topic: "Biểu đồ (Charts)", q: "Để thêm tiêu đề trục dọc (Vertical Axis Title) cho một biểu đồ đã chèn trong Word, bạn chọn biểu đồ và thao tác tại đâu?", opts: ["Chart Design > Add Chart Element > Axis Titles > Primary Vertical", "Insert > Text Box > kéo vào cạnh biểu đồ", "Format > Insert Title", "Chart Design > Quick Layout > Layout 1"], ans: 0, exp: "Chart Design > Add Chart Element (hoặc dấu + góc trên bên phải biểu đồ) > Axis Titles." },
+        { topic: "Biểu mẫu (Forms)", q: "Khi thiết kế biểu mẫu bằng Content Controls trên thẻ Developer, để ngăn người dùng vô tình xóa mất khung điều khiển khi đang điền thông tin, bạn mở Properties của điều khiển đó và tích chọn mục nào?", opts: ["Content control cannot be deleted", "Contents cannot be edited", "Use a style to format text", "Remove content control when contents are edited"], ans: 0, exp: "Tích 'Content control cannot be deleted' khóa khung điều khiển nhưng vẫn cho phép nhập/chọn dữ liệu bên trong." },
+        { topic: "Quản lý tài liệu", q: "Sự khác biệt giữa 'Compare' và 'Combine' trong thẻ Review > nhóm Compare là gì?", opts: ["Compare so sánh 2 phiên bản để tìm khác biệt; Combine gộp các chỉnh sửa/bình luận của nhiều người phản biện khác nhau vào một tài liệu duy nhất", "Compare dùng cho Word; Combine dùng cho Excel", "Compare xóa Track Changes; Combine bật Track Changes", "Hai lệnh này hoàn toàn giống nhau"], ans: 0, exp: "Combine tổng hợp các bản sửa đổi độc lập từ nhiều người duyệt (Reviewers) vào cùng một bản gốc." },
+        { topic: "Bố cục & Hiển thị", q: "Khác với lệnh 'Split' (chia đôi một cửa sổ), lệnh 'New Window' trên thẻ View dùng để làm gì?", opts: ["Mở thêm một cửa sổ độc lập thứ hai của cùng một tệp tài liệu đó (hữu ích khi dùng 2 màn hình hoặc xếp cạnh nhau bằng View Side by Side)", "Tạo một tệp tài liệu trắng mới hoàn toàn", "Nhân bản tệp hiện tại thành bản sao mới", "Mở tài liệu ở chế độ toàn màn hình Read Mode"], ans: 0, exp: "New Window mở cửa sổ thứ hai trỏ tới cùng một file; mọi thay đổi ở cửa sổ này cập nhật tức thì ở cửa sổ kia." },
+        { topic: "Tùy chỉnh Word", q: "Để thiết lập tự động lưu mặc định dưới định dạng 'Word 97-2003 Document (*.doc)' cho mọi tài liệu mới (khi làm việc với đối tác dùng phần mềm cũ), bạn chỉnh ở đâu?", opts: ["File > Options > Save > mục 'Save files in this format'", "File > Save As > Set Default Format", "File > Info > Check Compatibility", "File > Options > General > Default File Type"], ans: 0, exp: "File > Options > Save > Save files in this format quy định định dạng tệp mặc định khi nhấn Save." },
+        { topic: "Định dạng đoạn văn", q: "Khi một tiêu đề Heading 2 bị nằm ở dòng cuối cùng của trang 3 trong khi đoạn văn mô tả của nó nằm ở đầu trang 4, thuộc tính nào trên Heading 2 đang bị tắt?", opts: ["Keep with next", "Keep lines together", "Widow/Orphan control", "Page break before"], ans: 0, exp: "Keep with next ràng buộc đoạn văn hiện tại luôn đi liền cùng trang với đoạn văn kế tiếp." },
+        { topic: "Bảng biểu (Tables)", q: "Để biến một bảng có 4 cột với độ rộng không đều nhau thành 4 cột có độ rộng bằng nhau chính xác đến từng milimet, bạn chọn toàn bộ bảng và nhấn nút nào?", opts: ["Layout (Table Tools) > nhóm Cell Size > Distribute Columns", "Layout (Table Tools) > AutoFit > AutoFit Window", "Table Design > Borders > Equal Columns", "Layout (Table Tools) > Distribute Rows"], ans: 0, exp: "Distribute Columns chia đều tổng chiều rộng bảng cho số cột được chọn." },
+        { topic: "Chèn đối tượng", q: "Khi sử dụng 'Insert > Screenshot > Screen Clipping', tại sao cửa sổ Word tự động thu nhỏ (ẩn đi) ngay trước khi con trỏ biến thành dấu cộng cắt màn hình?", opts: ["Để bạn có thể cắt vùng hình ảnh từ cửa sổ ứng dụng nằm ngay phía sau cửa sổ Word", "Do phần mềm bị treo tạm thời", "Để lưu ảnh vào Clipboard thay vì chèn vào trang", "Do chưa bật quyền truy cập màn hình"], ans: 0, exp: "Screen Clipping tự động ẩn cửa sổ Word để lộ cửa sổ ứng dụng liền kề phía sau cho phép khoanh vùng chụp." },
+        { topic: "Trộn thư (Mail Merge)", q: "Khi chèn trường 'Greeting Line' (Dòng chào hỏi) trong Mail Merge, nếu một bản ghi trong danh sách Excel bị trống cột Họ Tên, bạn thiết lập hiển thị câu thay thế như 'Kính gửi Quý khách,' ở mục nào?", opts: ["Mục 'Greeting line for invalid recipient names' trong hộp thoại Insert Greeting Line", "Mục Match Fields", "Mục Preview Results", "Mục Edit Recipient List"], ans: 0, exp: "Hộp thoại Insert Greeting Line có tùy chọn riêng cho các trường hợp tên người nhận bị thiếu/không hợp lệ." },
+        { topic: "Trộn thư (Mail Merge)", q: "Khi tạo nhãn dán thư (Labels) bằng Mail Merge, sau khi thiết kế xong ô nhãn đầu tiên ở góc trên bên trái, bạn nhấn nút nào trên thẻ Mailings để sao chép bố cục đó sang toàn bộ các ô nhãn còn lại trên trang?", opts: ["Update Labels", "Finish & Merge", "Propagate Fields", "Match Fields"], ans: 0, exp: "Nút Update Labels (chỉ sáng lên khi Document Type là Labels) nhân bản định dạng và trường trộn từ nhãn đầu sang tất cả nhãn còn lại." },
+        { topic: "Tham chiếu (References)", q: "Đường kẻ ngang ngắn ngăn cách giữa phần nội dung văn bản chính và phần chú thích cuối trang (Footnote) gọi là gì và chỉnh sửa ở đâu?", opts: ["Footnote Separator — chỉnh sửa bằng cách chuyển sang chế độ Draft > References > Show Notes", "Bottom Border — chỉnh sửa ở thẻ Home", "Footer Line — chỉnh sửa trong Header & Footer", "Page Divider — chỉnh sửa ở thẻ Design"], ans: 0, exp: "Để sửa/xóa Footnote Separator, chuyển sang View > Draft > References > Show Notes > chọn Footnote Separator trong danh sách thả xuống." },
+        { topic: "Định dạng văn bản", q: "Sự khác biệt giữa 'Shading' (thẻ Home > nhóm Paragraph) và 'Text Highlight Color' (thẻ Home > nhóm Font) khi áp dụng lên văn bản là gì?", opts: ["Shading tô màu nền phủ kín cả chiều rộng khối đoạn văn (hoặc ô bảng); Text Highlight Color chỉ tô sát theo từng ký tự chữ", "Shading chỉ có màu vàng; Text Highlight Color có nhiều màu", "Text Highlight Color không in ra giấy được; Shading in được", "Hai công cụ này hoàn toàn giống nhau"], ans: 0, exp: "Shading là thuộc tính nền của đoạn văn/ô; Text Highlight Color là công cụ đánh dấu ký tự bằng bút dạ." },
+        { topic: "Kiểm tra văn bản", q: "Để Word bỏ qua không kiểm tra lỗi chính tả đối với các từ viết hoa toàn bộ (như 'HTML', 'ASEAN', 'TCP/IP') trên toàn bộ hệ thống, bạn thiết lập ở đâu?", opts: ["File > Options > Proofing > tích chọn 'Ignore words in UPPERCASE'", "Review > Spelling & Grammar > Ignore All", "Review > Language > Do not check spelling", "File > Options > Advanced > Ignore Caps"], ans: 0, exp: "Tùy chọn 'Ignore words in UPPERCASE' trong Proofing giúp bỏ qua các từ viết tắt in hoa." },
+        { topic: "Kiểm tra văn bản", q: "Để kiểm tra chính tả tiếng Việt hoặc tiếng Pháp cho một đoạn văn bản ngoại ngữ nằm xen kẽ trong tài liệu tiếng Anh, bạn bôi đen đoạn đó và thiết lập tại đâu?", opts: ["Review > nhóm Language > Language > Set Proofing Language", "File > Options > Display Language", "Review > Translate > Translate Selection", "Home > Font > Script"], ans: 0, exp: "Set Proofing Language gán ngôn ngữ kiểm tra chính tả riêng biệt cho đoạn văn bản được chọn." },
+        { topic: "Hình ảnh & Đồ họa", q: "Khi xoay (Rotate) một bức ảnh nghiêng một góc chính xác 32 độ theo chiều kim đồng hồ, bạn thiết lập thông số này ở đâu?", opts: ["Picture Format > Rotate > More Rotation Options > nhập Rotation: 32°", "Kéo tay cầm xoay phía trên ảnh đến khi đạt 32°", "Picture Format > 3-D Rotation > X Rotation: 32°", "Layout > Position > Angle: 32°"], ans: 0, exp: "More Rotation Options mở hộp thoại Layout > thẻ Size > ô Rotation cho phép nhập góc xoay chính xác." },
+        { topic: "Quản lý trang", q: "Khi bật đánh số dòng 'Line Numbers > Restart Each Page', số dòng ở đầu mỗi trang mới sẽ bắt đầu lại từ số mấy?", opts: ["Số 1", "Số 0", "Nối tiếp số dòng cuối của trang trước", "Theo số trang hiện tại"], ans: 0, exp: "Restart Each Page đặt lại bộ đếm số dòng về 1 ở đầu mỗi trang." },
+        { topic: "Danh sách (Lists)", q: "Khi đang gõ một danh sách gạch đầu dòng (Bulleted List), làm thế nào để xuống dòng bên trong cùng một mục (tạo đoạn giải thích nhỏ) mà KHÔNG sinh ra dấu chấm đầu dòng mới và KHÔNG kết thúc danh sách?", opts: ["Nhấn Shift + Enter (Manual Line Break)", "Nhấn Enter hai lần", "Nhấn Ctrl + Enter", "Nhấn Tab rồi Enter"], ans: 0, exp: "Shift + Enter tạo ngắt dòng mềm trong cùng một đoạn văn nên không tạo bullet mới." },
+        { topic: "Định dạng văn bản", q: "Tùy chọn dán 'Merge Formatting (M)' khi sao chép văn bản từ nguồn ngoài vào Word hoạt động như thế nào?", opts: ["Giữ lại các nhấn mạnh cục bộ như in đậm (Bold), in nghiêng (Italic) của nguồn, nhưng đổi phông chữ và cỡ chữ theo vị trí đích", "Giữ nguyên 100% phông chữ, màu sắc, nền của trang web gốc", "Xóa sạch toàn bộ định dạng kể cả in đậm, in nghiêng", "Dán nội dung dưới dạng một bức ảnh tĩnh"], ans: 0, exp: "Merge Formatting hòa trộn định dạng: giữ nhấn mạnh cơ bản (đậm/nghiêng) nhưng đồng bộ font/size với đoạn đích." },
+        { topic: "Chèn đối tượng", q: "Để lưu một phương trình toán học tự soạn thảo vào thư viện Equation tích hợp của Word để lần sau chèn lại nhanh chóng, bạn nhấp vào mũi tên góc phải khung phương trình và chọn gì?", opts: ["Save as New Equation...", "Set As Default Equation", "Add to Quick Access Toolbar", "Copy as MathML"], ans: 0, exp: "Save as New Equation... lưu công thức vào Building Blocks dưới mục Equations." },
+        { topic: "Quản lý tài liệu", q: "Tính năng 'Version History' (Lịch sử phiên bản) trong Word chỉ hoạt động tự động khi tệp tài liệu được lưu trữ ở đâu?", opts: ["Trên OneDrive hoặc SharePoint (với tính năng AutoSave đang bật)", "Trong ổ đĩa C:\\Users\\Documents cục bộ", "Trên USB gắn ngoài", "Ở định dạng .rtf hoặc .txt"], ans: 0, exp: "Version History yêu cầu lưu trữ đám mây trên OneDrive hoặc SharePoint." },
+        { topic: "Theo dõi thay đổi", q: "Để xem nhanh bản tóm tắt danh sách tất cả các chỉnh sửa (số lần chèn, số lần xóa, số bình luận) trong một khung bảng dọc bên trái hoặc dưới màn hình, bạn nhấn nút nào trên thẻ Review?", opts: ["Reviewing Pane (nhóm Tracking)", "Navigation Pane", "Selection Pane", "Document Inspector"], ans: 0, exp: "Reviewing Pane thống kê tổng số các loại thay đổi và liệt kê chi tiết từng chỉnh sửa." },
+        { topic: "Bảng biểu (Tables)", q: "Trong nhóm 'Table Style Options' của thẻ Table Design, tùy chọn 'First Column' và 'Last Column' có tác dụng gì?", opts: ["Áp dụng định dạng nhấn mạnh đặc biệt (như chữ in đậm, màu nền riêng) cho cột đầu tiên bên trái và cột cuối cùng bên phải của bảng", "Tự động chèn thêm một cột trống ở đầu và cuối bảng", "Khóa không cho chỉnh sửa cột đầu và cột cuối", "Tự động tính tổng ở cột cuối cùng"], ans: 0, exp: "First Column và Last Column bật/tắt định dạng đặc biệt (tô đậm/màu) đã được thiết kế sẵn trong Table Style." },
+        { topic: "Bố cục & Hiển thị", q: "Khi mở một tệp Word được gửi qua email, tài liệu mở ở chế độ 'Read Mode' (chế độ đọc toàn màn hình không có thanh Ribbon). Để chuyển về giao diện soạn thảo tiêu chuẩn, bạn chọn gì?", opts: ["View > Edit Document (hoặc nhấn phím Esc)", "File > Enable Editing", "Review > Restrict Editing > Stop Protection", "Nhấn Ctrl + E"], ans: 0, exp: "Trên thanh menu của Read Mode, vào View > Edit Document (hoặc nhấn Esc) để quay lại Print Layout." },
+        { topic: "Quản lý trang", q: "Khi chọn khổ giấy 'Letter' (8.5\" x 11\") thay vì 'A4' (8.27\" x 11.69\"), sự khác biệt về kích thước vật lý giữa hai khổ giấy này là gì?", opts: ["Khổ Letter rộng hơn một chút nhưng ngắn hơn khổ A4", "Khổ Letter dài hơn và hẹp hơn khổ A4", "Hai khổ giấy có kích thước bằng nhau tuyệt đối", "Khổ Letter lớn gấp đôi khổ A4"], ans: 0, exp: "A4 (210 x 297 mm) hẹp hơn và dài hơn Letter (215.9 x 279.4 mm) — đây là bẫy Page Setup kinh điển trong MOS." },
+        { topic: "Định dạng văn bản", q: "Để tạo chữ chỉ số trên như 'm²' (Superscript) hoặc chỉ số dưới như 'H₂O' (Subscript) bằng phím tắt, cặp tổ hợp phím nào chính xác?", opts: ["Ctrl + Shift + = (Superscript) và Ctrl + = (Subscript)", "Ctrl + Alt + = (Superscript) và Alt + = (Subscript)", "Ctrl + Up Arrow và Ctrl + Down Arrow", "Shift + F5 và Ctrl + F5"], ans: 0, exp: "Ctrl + = bật Subscript; Ctrl + Shift + = (tức Ctrl + +) bật Superscript." },
+        { topic: "SmartArt", q: "Để thêm một hình ảnh minh họa vào bên trong một khung hình tròn của sơ đồ SmartArt dạng Picture, bạn thực hiện thao tác nào?", opts: ["Nhấp trực tiếp vào biểu tượng bức ảnh nhỏ nằm ở chính giữa hình khối SmartArt đó", "Dùng Insert > Pictures rồi kéo đè lên trên SmartArt", "SmartArt Design > Insert Photo", "Nhấp chuột phải > Wrap Text > In Front of Text"], ans: 0, exp: "Các mẫu Picture SmartArt có sẵn nút placeholder hình ảnh ngay bên trong từng khối." },
+        { topic: "Chèn đối tượng", q: "Để chèn một biểu tượng (Symbol) bằng mã ký tự Unicode (ví dụ: nhập '2192' để chèn mũi tên →), bạn gõ mã đó vào hộp thoại Symbol (mục Character code) hoặc gõ trực tiếp trong văn bản rồi nhấn phím tắt nào?", opts: ["Alt + X", "Ctrl + U", "Shift + X", "Alt + F10"], ans: 0, exp: "Gõ mã Hex Unicode (như 2192) ngay trong Word và nhấn Alt + X sẽ chuyển đổi trực tiếp thành ký tự tương ứng." },
+        { topic: "Lưu trữ & Xuất bản", q: "Khi lưu một tài liệu Word có chứa mã tự động hóa (VBA Macros), bạn BẮT BUỘC phải chọn định dạng tệp nào để không bị mất mã Macro?", opts: ["Word Macro-Enabled Document (*.docm)", "Word Document (*.docx)", "Word Template (*.dotx)", "Single File Web Page (*.mht)"], ans: 0, exp: "Định dạng .docx mặc định loại bỏ toàn bộ Macro vì lý do bảo mật; phải lưu dưới dạng .docm." },
+        { topic: "Định dạng văn bản", q: "Để tự động chuyển đổi tất cả các dấu ngoặc kép thẳng (\" \") thành dấu ngoặc kép cong thẩm mỹ (“ ”) trong khi gõ văn bản, bạn bật tùy chọn nào?", opts: ["File > Options > Proofing > AutoCorrect Options > thẻ AutoFormat As You Type > tích 'Straight quotes with smart quotes'", "Home > Font > Smart Quotes", "Insert > Symbol > AutoFormat", "File > Options > Advanced > Smart Cut and Paste"], ans: 0, exp: "Tính năng Smart Quotes nằm trong AutoFormat As You Type." },
+        { topic: "Quản lý trang", q: "Để tạo màu nền chuyển sắc (Gradient) hoặc họa tiết (Texture) cho toàn bộ trang văn bản (chỉ hiển thị trên màn hình hoặc xuất PDF, mặc định không in ra giấy), bạn vào đâu?", opts: ["Design > Page Background > Page Color > Fill Effects...", "Insert > Shapes > Rectangle > Shape Fill", "Layout > Background > Gradient", "Home > Shading > Fill Effects"], ans: 0, exp: "Design > Page Color > Fill Effects cho phép thiết lập Gradient, Texture, Pattern hoặc Picture làm nền trang." },
+        { topic: "Hình ảnh & Đồ họa", q: "Để thay thế một bức ảnh cũ bằng một bức ảnh mới mà VẪN GIỮ NGUYÊN toàn bộ kích thước, vị trí, khung viền và hiệu ứng đã định dạng cho ảnh cũ, bạn chọn lệnh nào?", opts: ["Nhấp chuột phải vào ảnh > Change Picture > From a File...", "Xóa ảnh cũ rồi dùng Insert > Pictures chèn ảnh mới", "Picture Format > Reset Picture", "Dùng Format Painter quét từ ảnh cũ sang ảnh mới"], ans: 0, exp: "Change Picture thay thế nguồn ảnh mới nhưng bảo toàn mọi thuộc tính định dạng và kích thước hiện có." },
+        { topic: "Bảng biểu (Tables)", q: "Khi sử dụng công cụ 'Draw Table' (vẽ đường kẻ thêm ô trong bảng), làm thế nào để chuyển con trỏ chuột từ hình cây bút chì trở lại con trỏ soạn thảo văn bản bình thường?", opts: ["Nhấn phím Esc (hoặc nhấp lại vào nút Draw Table trên thẻ Layout)", "Nhấn phím Delete", "Nhấp đúp ra ngoài lề trang", "Nhấn Ctrl + Z"], ans: 0, exp: "Phím Esc tắt công cụ Draw Table (hoặc Eraser) và trả về con trỏ văn bản tiêu chuẩn." }
+      ];
+
+      // ==================== NGÂN HÀNG DỮ LIỆU EXCEL NÂNG CAO (100 CÂU: ĐÁP ÁN PHÂN BỔ ĐỀU A/B/C/D + TÌNH HUỐNG BẪY) ====================
+      const RAW_EXCEL_BANK = [
+        // --- CA 1: CÂU 1 - 50 ---
+        { topic: "Hàm điều kiện", q: "Công thức nào tính tổng doanh thu ở cột D (D2:D50) cho các đơn hàng có khu vực ở cột B (B2:B50) kết thúc bằng chữ 'Nam' (như 'Miền Nam', 'Đông Nam')?", opts: ['=SUMIF(D2:D50, "*Nam", B2:B50)', '=SUMIF(B2:B50, "*Nam", D2:D50)', '=SUMIF(B2:B50, "?Nam", D2:D50)', '=SUMIFS(B2:B50, D2:D50, "*Nam")'], ans: 1, exp: "Dấu sao (*) đại diện cho chuỗi ký tự bất kỳ đứng trước chữ 'Nam', và vùng điều kiện B2:B50 đứng trước vùng tính tổng D2:D50." },
+        { topic: "Hàm tra cứu", q: "Tại ô E2, bạn viết công thức =VLOOKUP(A2, $G$2:$J$20, 3, FALSE) và nhận kết quả lỗi #N/A mặc dù mã A2 rõ ràng có trong cột G. Nguyên nhân bẫy phổ biến nhất là gì?", opts: ["Tham số thứ 4 phải đổi thành TRUE", "Một bên lưu mã dưới dạng Số (Number) còn một bên lưu dưới dạng Chuỗi (Text) hoặc có dấu cách thừa", "Vùng bảng $G$2:$J$20 chưa được sắp xếp tăng dần", "Chỉ số cột 3 vượt quá số cột của bảng tham chiếu"], ans: 1, exp: "VLOOKUP phân biệt kiểu dữ liệu Number và Text (ví dụ số 101 khác chuỗi '101') và nhạy cảm với khoảng trắng thừa." },
+        { topic: "Địa chỉ ô", q: "Tại ô C2 có công thức =SUM($A2:B$2). Khi sao chép công thức này xuống ô C5, công thức tại ô C5 sẽ là gì?", opts: ["=SUM($A5:B$5)", "=SUM($A5:B$2)", "=SUM($A2:B$5)", "=SUM($D5:E$2)"], ans: 1, exp: "$A2 không khóa hàng nên hàng 2 tăng thành 5 ($A5); B$2 khóa cố định hàng 2 nên giữ nguyên B$2." },
+        { topic: "Định dạng có điều kiện", q: "Để tô màu toàn bộ HÀNG dữ liệu (từ cột A đến cột F) nếu ô trạng thái ở cột F của hàng đó bằng 'Quá hạn', bạn dùng công thức nào trong Conditional Formatting (với vùng chọn A2:F30)?", opts: ['=F2="Quá hạn"', '=$F2="Quá hạn"', '=$F$2="Quá hạn"', '=F$2="Quá hạn"'], ans: 1, exp: "Phải khóa tuyệt đối cột $F nhưng để hàng 2 tương đối (=$F2=\"Quá hạn\") để quy tắc kiểm tra cột F trên từng hàng tương ứng." },
+        { topic: "Quản lý bảng (Table)", q: "Khi bảng Excel Table đang bật 'Total Row' ở hàng 51, nếu bạn dùng AutoFilter để lọc ra chỉ 10 đơn hàng của tháng 5, hàm SUBTOTAL mặc định trong Total Row sẽ tính toán như thế nào?", opts: ["Tính tổng của tất cả 50 hàng gốc (bao gồm cả các hàng đang bị ẩn)", "Chỉ tính tổng của 10 hàng đang hiển thị sau khi lọc", "Báo lỗi #REF! do vùng dữ liệu bị thu hẹp", "Tự động ẩn luôn dòng Total Row"], ans: 1, exp: "Total Row mặc định sử dụng hàm SUBTOTAL(109, ...), chỉ tính toán trên các hàng đang hiển thị và bỏ qua hàng bị lọc ẩn." },
+        { topic: "Xác thực dữ liệu", q: "Bạn muốn thiết lập Data Validation cho cột Ngày giao hàng (D2:D50) sao cho chỉ cho phép nhập ngày lớn hơn hoặc bằng ngày đặt hàng ở cột C (C2:C50) của cùng hàng. Bạn chọn Allow: Custom và nhập công thức gì?", opts: ["=D2>=C2", "=$D$2>=$C$2", "=DATE(D2)>=DATE(C2)", "=IF(D2>=C2, TRUE, FALSE)"], ans: 0, exp: "Chọn vùng D2:D50 (với D2 là ô kích hoạt) và nhập công thức tương đối =D2>=C2 để Excel tự áp dụng cho từng hàng." },
+        { topic: "Biểu đồ (Charts)", q: "Khi dữ liệu nguồn của biểu đồ chứa các hàng bị ẩn (Hide Rows), mặc định Excel sẽ ẩn các điểm dữ liệu đó trên biểu đồ. Làm thế nào để biểu đồ VẪN hiển thị dữ liệu của các hàng đã ẩn?", opts: ["Chart Design > Select Data > nhấn nút 'Hidden and Empty Cells' > tích 'Show data in hidden rows and columns'", "Format > Chart Area > Show Hidden Data", "Data > Outline > Unhide Chart Series", "Không thể hiển thị dữ liệu của hàng đã ẩn trên biểu đồ"], ans: 0, exp: "Trong hộp thoại Select Data Source có nút 'Hidden and Empty Cells' ở góc dưới bên trái để cấu hình." },
+        { topic: "Hàm xử lý chuỗi", q: "Ô A2 chứa chuỗi 'HD-2026-889'. Công thức nào trích xuất được chính xác cụm '2026' ở giữa bất kể độ dài mã đầu và mã cuối thay đổi?", opts: ['=MID(A2, 4, 4)', '=MID(A2, FIND("-", A2)+1, 4)', '=LEFT(RIGHT(A2, 8), 4)', "Cả A và B đều cho ra '2026', nhưng B linh hoạt hơn nếu mã đầu dài hơn 2 ký tự"], ans: 3, exp: "FIND(\"-\", A2)+1 xác định động vị trí ngay sau dấu gạch ngang đầu tiên." },
+        { topic: "Quản lý trang tính", q: "Trên một trang tính đang bật chế độ 'Split' (chia 4 khung nhìn) và bạn muốn chuyển sang dùng 'Freeze Panes' để khóa cố định hàng tiêu đề, tại sao nút Freeze Panes lại bị mờ hoặc hoạt động khác thường?", opts: ["Split và Freeze Panes loại trừ lẫn nhau; nhấn Freeze Panes khi đang Split sẽ đóng băng ngay tại vị trí đường chia Split hiện tại", "Phải tắt Protect Workbook trước", "Freeze Panes chỉ dùng được ở chế độ Page Layout", "Phải xóa toàn bộ công thức trên Sheet trước"], ans: 0, exp: "Nếu đang bật Split, lệnh Freeze Panes sẽ khóa cố định các ngăn theo đúng đường ranh giới chia Split." },
+        { topic: "In ấn (Page Setup)", q: "Khi in một bảng tính có 5 trang, chữ ở cuối trang 1 bị quá nhỏ vì bạn đã thiết lập 'Fit to: 1 page(s) wide by 1 tall' trước đó. Để khôi phục kích thước chữ in về đúng tỷ lệ gốc 100%, bạn chỉnh thông số nào?", opts: ["Page Layout > nhóm Scale to Fit > chọn 'Adjust to: 100% normal size' (hoặc đặt Width: Automatic, Height: Automatic)", "Home > Font > Size: 11", "View > Zoom > 100%", "File > Print > Reset Margins"], ans: 0, exp: "Zoom trên thanh trạng thái chỉ phóng to thu nhỏ khi xem; tỷ lệ in thực tế nằm ở mục Scale to Fit." },
+        { topic: "PivotTable", q: "Trong PivotTable, cột 'Doanh thu' đang hiển thị dưới dạng 'Count of Doanh thu' (đếm số giao dịch) thay vì tính tổng do cột nguồn có lẫn vài ô trống. Làm thế nào để đổi lại thành tính tổng?", opts: ["Nhấp chuột phải vào cột số liệu trong PivotTable > Summarize Values By > chọn Sum", "Dùng hàm =SUM() gõ đè lên ô tổng của PivotTable", "Vào Data > Consolidate > Sum", "Đổi định dạng ô sang Currency"], ans: 0, exp: "Summarize Values By cho phép chuyển đổi phép tính giữa Sum, Count, Average, Max, Min..." },
+        { topic: "Hàm logic", q: "Hàm =IFS(D2>=9, \"Xuất sắc\", D2>=8, \"Giỏi\", D2>=6.5, \"Khá\", TRUE, \"Trung bình\") trả về kết quả gì khi D2 = 8.5?", opts: ["Xuất sắc", "Giỏi", "Khá", "Trung bình"], ans: 1, exp: "Hàm IFS kiểm tra từ trái sang phải và dừng lại ở điều kiện đầu tiên đúng: D2>=8 đúng nên trả về 'Giỏi'." },
+        { topic: "Dữ liệu (Data Tools)", q: "Khi dùng 'Flash Fill' (Ctrl + E) để tách tên riêng từ cột Họ và Tên, đôi khi Excel nhận diện sai quy luật ở những người có tên đệm dài 3 chữ. Cách huấn luyện Flash Fill chính xác nhất là gì?", opts: ["Sửa tay trực tiếp 2–3 ví dụ mẫu đầu tiên ngay bên dưới ô sai rồi nhấn Enter để Flash Fill tự học lại toàn cột", "Xóa toàn bộ cột và nhập lại bằng hàm", "Sắp xếp cột Họ và Tên theo thứ tự A-Z trước", "Chuyển cột sang định dạng General"], ans: 0, exp: "Sửa trực tiếp kết quả sai trong vùng Flash Fill sẽ kích hoạt thuật toán học mẫu lại ngay lập tức." },
+        { topic: "Định dạng số", q: "Mã định dạng Custom Number Format gồm 4 phần phân cách bởi dấu chấm phẩy: `#,##0;(#,##0);\"-\";@`. Nếu ô chứa giá trị số `0`, ô đó sẽ hiển thị ký tự gì?", opts: ["0", "(0)", "-", "@"], ans: 2, exp: "Cấu trúc 4 phần của Custom Format: [Số dương];[Số âm];[Số 0];[Văn bản]. Phần thứ 3 là \"-\"." },
+        { topic: "Biểu đồ thu nhỏ", q: "Sau khi tạo một nhóm Sparklines cho 10 hàng dữ liệu, bạn muốn làm nổi bật điểm cao nhất (High Point) bằng chấm tròn màu đỏ trên mỗi đường Sparkline. Bạn thiết lập ở đâu?", opts: ["Thẻ ngữ cảnh Sparkline > nhóm Show > tích chọn 'High Point' và chỉnh màu ở Marker Color", "Chart Design > Add Chart Element > Data Labels", "Home > Conditional Formatting > Top 10 Items", "Insert > Shapes > Circle"], ans: 0, exp: "Thẻ ngữ cảnh Sparkline > nhóm Show cho phép bật High Point, Low Point, First Point, Last Point, Negative Points." },
+        { topic: "Hàm ngày tháng", q: "Để tính ngày cuối cùng của tháng sau (ví dụ từ ngày 15/03/2026 tính ra ngày 30/04/2026), bạn dùng công thức nào?", opts: ["=EOMONTH(A2, 1)", "=EDATE(A2, 1)", "=EOMONTH(A2, 0)", "=DATE(YEAR(A2), MONTH(A2)+1, 30)"], ans: 0, exp: "EOMONTH(start_date, months) trả về ngày cuối tháng; months = 0 là cuối tháng hiện tại, months = 1 là cuối tháng kế tiếp." },
+        { topic: "Quản lý dữ liệu", q: "Khi dùng 'Text to Columns' để tách chuỗi ngày tháng định dạng '20260521' (YYYYMMDD) đang bị lưu dạng văn bản thành ngày tháng chuẩn của Excel, ở bước 3 của Wizard bạn chọn định dạng cột là gì?", opts: ["Date: YMD", "General", "Text", "Date: DMY"], ans: 0, exp: "Chọn Date: YMD giúp Excel phân tích đúng 4 ký tự đầu là Năm, 2 ký tự giữa là Tháng, 2 ký tự cuối là Ngày." },
+        { topic: "Hàm thống kê", q: "Hàm =COUNTIF(A1:A20, \"*\") đếm những ô nào trong vùng A1:A20?", opts: ["Chỉ đếm các ô chứa dữ liệu dạng VĂN BẢN (Text), bỏ qua ô chứa số và ô trống", "Đếm tất cả các ô không rỗng (cả số và chữ)", "Đếm các ô chứa dấu hoa thị (*)", "Đếm các ô bị lỗi công thức"], ans: 0, exp: "Ký tự đại diện \"*\" trong COUNTIF chỉ khớp với dữ liệu kiểu chuỗi văn bản (Text), không đếm giá trị số thuần túy." },
+        { topic: "In ấn (Page Setup)", q: "Trong hộp thoại Page Setup > thẻ Sheet, mục 'Columns to repeat at left' dùng trong trường hợp nào?", opts: ["Khi bảng tính rất rộng tràn sang nhiều trang theo chiều ngang, giúp lặp lại cột Mã NV/Họ tên (ví dụ $A:$B) ở lề trái mỗi trang in", "Khi muốn cố định cột A trên màn hình làm việc", "Khi muốn in lặp lại hàng tiêu đề ở đầu trang", "Khi muốn căn lề trái cho trang in"], ans: 0, exp: "Columns to repeat at left lặp lại các cột định danh bên trái khi bảng tính phân trang theo chiều ngang." },
+        { topic: "Tên vùng (Named Range)", q: "Để chỉnh sửa phạm vi tham chiếu (Refers to) hoặc xóa một Named Range đã tạo trước đó, bạn mở công cụ nào?", opts: ["Formulas > nhóm Defined Names > Name Manager (Ctrl + F3)", "Data > Data Tools > Name Editor", "Home > Find & Select > Go To Special", "Insert > Links > Manage Names"], ans: 0, exp: "Name Manager (Ctrl + F3) quản lý toàn bộ tên vùng, hằng số và công thức đặt tên trong Workbook." },
+        { topic: "Dữ liệu (Data Tools)", q: "Khi dùng 'Remove Duplicates' trên bảng gồm 3 cột (Mã Đơn, Sản Phẩm, Số Lượng), nếu bạn chỉ tích chọn cột 'Mã Đơn' và bỏ tích 2 cột còn lại, Excel sẽ xử lý thế nào khi gặp 2 dòng có cùng Mã Đơn nhưng khác Sản Phẩm?", opts: ["Giữ lại dòng xuất hiện đầu tiên và xóa dòng thứ hai (vì chỉ kiểm tra trùng lặp trên cột Mã Đơn)", "Báo lỗi vì 2 cột còn lại có dữ liệu khác nhau", "Chỉ xóa khi cả 3 cột giống hệt nhau", "Gộp số lượng của 2 dòng lại thành 1 dòng"], ans: 0, exp: "Remove Duplicates chỉ so sánh các cột được tích chọn và luôn giữ lại bản ghi đầu tiên từ trên xuống." },
+        { topic: "Hàm tìm kiếm", q: "Hàm =MATCH(\"Cam\", {\"Táo\",\"Lê\",\"Cam\",\"Xoài\"}, 0) trả về giá trị bao nhiêu?", opts: ["3", "2", "Cam", "#N/A"], ans: 0, exp: "MATCH trả về vị trí tương đối (đếm từ 1) của phần tử trong mảng: 'Cam' đứng ở vị trí thứ 3." },
+        { topic: "Biểu đồ (Charts)", q: "Để khoảng cách khe hở giữa các cột (Gap Width) trong biểu đồ cột (Column Chart) hẹp lại giúp các cột trông to và đậm nét hơn, bạn mở ngăn 'Format Data Series' và điều chỉnh thông số nào?", opts: ["Giảm tỷ lệ phần trăm của Gap Width (ví dụ từ 219% xuống 80%)", "Tăng tỷ lệ phần trăm của Gap Width lên 400%", "Tăng Series Overlap lên 100%", "Đổi sang biểu đồ Stacked Column"], ans: 0, exp: "Gap Width là độ rộng khoảng trống giữa các nhóm cột; giảm Gap Width làm bản thân các cột rộng ra." },
+        { topic: "Quản lý trang tính", q: "Khi bạn chọn đồng thời 3 Sheet (Sheet1, Sheet2, Sheet3) bằng phím Ctrl (chế độ Group) và gõ chữ 'BÁO CÁO' vào ô A1 của Sheet1, điều gì xảy ra?", opts: ["Ô A1 của cả 3 Sheet đều tự động được nhập chữ 'BÁO CÁO'", "Chỉ ô A1 của Sheet1 có dữ liệu", "Excel báo lỗi không cho nhập liệu khi đang nhóm Sheet", "Dữ liệu chỉ được lưu vào Sheet cuối cùng"], ans: 0, exp: "Chế độ Group Sheets đồng bộ mọi thao tác nhập liệu và định dạng lên cùng tọa độ ô của tất cả các Sheet đang chọn." },
+        { topic: "Hàm toán học", q: "Hàm =ROUNDUP(12.11, 1) và =ROUNDDOWN(12.99, 1) lần lượt cho ra cặp kết quả nào?", opts: ["12.2 và 12.9", "12.1 và 13.0", "13.0 và 12.0", "12.11 và 12.99"], ans: 0, exp: "ROUNDUP luôn làm tròn ra xa số 0 (12.11 -> 12.2); ROUNDDOWN luôn cắt bỏ phần lẻ về phía 0 (12.99 -> 12.9)." },
+        { topic: "Công thức & Kiểm tra", q: "Lỗi #REF! xuất hiện trong ô công thức khi nào?", opts: ["Khi hàng hoặc cột chứa ô tham chiếu của công thức bị xóa vĩnh viễn", "Khi viết sai tên hàm", "Khi chia cho 0", "Khi công thức mảng trả về kết quả tràn vào ô đang có dữ liệu"], ans: 0, exp: "#REF! (Invalid Cell Reference) xảy ra khi tham chiếu bị phá hủy do xóa hàng/cột hoặc dán đè." },
+        { topic: "Công thức & Kiểm tra", q: "Công cụ 'Evaluate Formula' (Formulas > Formula Auditing) giúp ích gì khi gỡ lỗi một công thức lồng nhau phức tạp?", opts: ["Chạy từng bước tính toán của từng biểu thức con từ trong ra ngoài để chỉ rõ phần nào sinh ra lỗi hoặc sai kết quả", "Tự động sửa lại cú pháp công thức bị sai", "Chuyển đổi công thức thành giá trị tĩnh", "Tìm kiếm tất cả các ô có chứa công thức trên Sheet"], ans: 0, exp: "Evaluate Formula (nhấn nút Evaluate từng bước) giúp kiểm tra giá trị trung gian của từng hàm lồng nhau." },
+        { topic: "Bảo vệ dữ liệu", q: "Khi bật 'Protect Sheet', để người dùng VẪN có thể sử dụng nút lọc dữ liệu (AutoFilter) và sắp xếp (Sort) trên bảng nhưng không sửa được nội dung ô, bạn phải tích chọn mục nào trong hộp thoại Protect Sheet?", opts: ["Use AutoFilter và Sort", "Select unlocked cells", "Format cells", "Edit objects"], ans: 0, exp: "Hộp thoại Protect Sheet liệt kê danh sách các quyền cụ thể được phép thực hiện trên Sheet đã khóa." },
+        { topic: "Hàm điều kiện nhiều tiêu chí", q: "Trong hàm =COUNTIFS(A2:A50, \"<>Hủy\", B2:B50, \">=100\"), biểu thức `\"<>Hủy\"` có ý nghĩa gì?", opts: ["Đếm các ô có giá trị KHÁC chữ 'Hủy'", "Đếm các ô chứa chữ 'Hủy' nằm trong dấu ngoặc nhọn", "Đếm các ô rỗng", "Báo lỗi cú pháp vì không được dùng dấu <> trong chuỗi"], ans: 0, exp: "Toán tử `<>` trong tiêu chí điều kiện của Excel có nghĩa là 'Khác' (Not equal to)." },
+        { topic: "Sắp xếp & Lọc", q: "Để sắp xếp các ô trong một cột dựa theo MÀU NỀN (Cell Color) của ô (ví dụ: đưa tất cả các ô tô màu vàng lên trên cùng), bạn chọn giá trị nào ở mục 'Sort On' trong hộp thoại Custom Sort?", opts: ["Cell Color", "Cell Values", "Font Color", "Conditional Formatting Icon"], ans: 0, exp: "Mục 'Sort On' hỗ trợ sắp xếp theo Cell Values, Cell Color, Font Color và Conditional Formatting Icon." },
+        { topic: "Biểu đồ (Charts)", q: "Khi tạo biểu đồ 'Pie of Pie' hoặc 'Bar of Pie', mục đích chính của loại biểu đồ này là gì?", opts: ["Tách các miếng bánh có tỷ trọng quá nhỏ thành một biểu đồ phụ bên cạnh để người xem dễ đọc nhãn số liệu", "So sánh dữ liệu của hai năm khác nhau", "Hiển thị xu hướng biến động theo thời gian", "Vẽ biểu đồ 3 chiều có chiều sâu"], ans: 0, exp: "Pie of Pie gom các phần tử nhỏ thành nhóm 'Other' và phóng to chi tiết sang biểu đồ tròn phụ bên cạnh." },
+        { topic: "Siêu liên kết", q: "Hàm =HYPERLINK(\"https://microsoft.com\", \"Trang chủ Microsoft\") có ưu điểm gì so với việc dùng hộp thoại Insert Hyperlink (Ctrl + K)?", opts: ["Có thể tạo liên kết động dựa trên dữ liệu của các ô khác bằng phép nối chuỗi", "Chỉ mở được khi không có kết nối Internet", "Tự động tải trang web về máy tính", "Không hiển thị màu xanh gạch chân"], ans: 0, exp: "Hàm HYPERLINK cho phép ghép biến ô động (ví dụ: =HYPERLINK(\"mailto:\" & B2, \"Gửi thư\"))." },
+        { topic: "Hàm xử lý chuỗi", q: "Ô A2 chứa chuỗi ký tự được tải từ hệ thống ERP về có chứa ký tự xuống dòng ẩn (ASCII 10) khiến hàm TRIM không xóa sạch được. Bạn cần lồng thêm hàm nào để loại bỏ ký tự không in được này?", opts: ["=TRIM(CLEAN(A2))", "=PROPER(TRIM(A2))", "=VALUE(TRIM(A2))", "=SUBSTITUTE(A2, \" \", \"\")"], ans: 0, exp: "CLEAN loại bỏ 32 ký tự điều khiển không in được đầu tiên trong bảng mã ASCII (mã 0 đến 31)." },
+        { topic: "PivotTable", q: "Để tạo nhanh hàng chục trang báo cáo PivotTable riêng biệt — mỗi trang lọc sẵn cho một 'Chi nhánh' khác nhau — chỉ bằng một cú nhấp chuột, bạn đặt trường 'Chi nhánh' vào vùng Filters và dùng lệnh nào?", opts: ["PivotTable Analyze > nhóm PivotTable > mũi tên cạnh Options > Show Report Filter Pages...", "Insert > Slicer > Split Pages", "Design > Report Layout > Repeat All Item Labels", "PivotTable Analyze > Field Settings > Break Pages"], ans: 0, exp: "Show Report Filter Pages... tự động nhân bản PivotTable thành các Sheet riêng biệt cho từng giá trị trong vùng Filters." },
+        { topic: "Chế độ xem", q: "Tính năng 'Custom Views' (View > Workbook Views > Custom Views) dùng để làm gì?", opts: ["Lưu lại các trạng thái hiển thị khác nhau (như bộ lọc đang áp dụng, các hàng/cột đang ẩn, thiết lập in) để chuyển đổi nhanh", "Tạo giao diện màu tối (Dark Mode) cho Excel", "Tự động dịch tiêu đề cột sang ngôn ngữ khác", "Khóa thanh công cụ Ribbon"], ans: 0, exp: "Custom Views lưu cấu hình ẩn/hiện hàng cột, bộ lọc và thiết lập in (lưu ý bị vô hiệu hóa nếu Sheet có chứa Excel Table)." },
+        { topic: "Hàm ngày tháng", q: "Hàm =WEEKDAY(DATE(2026, 11, 21), 2) trả về số mấy (biết ngày 21/11/2026 là thứ Bảy)?", opts: ["6", "7", "5", "1"], ans: 0, exp: "Với return_type = 2, thứ Hai là 1 ... thứ Bảy là 6, Chủ Nhật là 7." },
+        { topic: "Bảng (Table)", q: "Khi đang cuộn chuột xuống hàng 200 bên trong một vùng dữ liệu đã định dạng là 'Excel Table', điều gì đặc biệt xảy ra ở thanh tiêu đề cột (A, B, C...)?", opts: ["Các chữ cái tên cột A, B, C tự động biến thành tên tiêu đề của bảng mà không cần dùng Freeze Panes", "Bảng tự động chia thành 2 trang", "Thanh công thức tự động ẩn đi", "Các hàng phía trên tự động gộp lại"], ans: 0, exp: "Khi ô hiện hành nằm trong Excel Table và cuộn qua hàng tiêu đề, Excel tự động thay chữ cái cột bằng Header của Table." },
+        { topic: "Công thức mảng / Tham chiếu", q: "Trong Excel 365/2021+, lỗi `#SPILL!` xuất hiện khi nào?", opts: ["Khi một công thức mảng động (như FILTER, UNIQUE, SORT) trả về nhiều kết quả nhưng các ô phía dưới/bên phải bị vướng dữ liệu cản đường", "Khi công thức có quá nhiều dấu ngoặc đơn", "Khi tổng giá trị vượt quá giới hạn bộ nhớ", "Khi chia một mảng cho số 0"], ans: 0, exp: "#SPILL! báo hiệu vùng đổ kết quả (Spill range) của công thức mảng bị chặn bởi dữ liệu có sẵn hoặc ô gộp (Merged cells)." },
+        { topic: "Phân tích giả định", q: "Để tạo một bảng tính độ nhạy 2 biến (ví dụ: xem Lợi nhuận thay đổi thế nào khi Lãi suất chạy từ 5%–10% ở cột và Thời hạn vay chạy từ 12–36 tháng ở hàng), bạn dùng công cụ nào?", opts: ["Data > What-If Analysis > Data Table", "Data > What-If Analysis > Goal Seek", "Insert > PivotTable", "Data > Forecast Sheet"], ans: 0, exp: "Data Table (1 biến hoặc 2 biến) tính toán đồng loạt kết quả công thức cho nhiều tổ hợp biến đầu vào." },
+        { topic: "Định dạng ô", q: "Khi hai ô A1 và B1 được gộp lại bằng 'Merge & Center' trong khi cả hai ô đều đang chứa dữ liệu văn bản, Excel sẽ xử lý thế nào?", opts: ["Hiển thị cảnh báo và chỉ giữ lại giá trị của ô trên cùng bên trái (ô A1), xóa bỏ giá trị của ô B1", "Tự động nối văn bản của cả hai ô lại với nhau", "Báo lỗi không cho phép gộp ô", "Giữ lại giá trị của ô bên phải (ô B1)"], ans: 0, exp: "Merge & Center chỉ bảo toàn giá trị ô góc trên bên trái; muốn giữ cả hai phải dùng hàm nối chuỗi hoặc định dạng 'Center Across Selection'." },
+        { topic: "Hàm thống kê", q: "Hàm =RANK.EQ(B2, $B$2:$B$20, 0) xếp hạng giá trị ô B2 như thế nào?", opts: ["Xếp hạng giảm dần (số lớn nhất đạt hạng 1)", "Xếp hạng tăng dần (số nhỏ nhất đạt hạng 1)", "Tính phần trăm thứ hạng từ 0 đến 1", "Báo lỗi nếu có hai số bằng nhau"], ans: 0, exp: "Tham số order = 0 (hoặc bỏ trống) xếp hạng giảm dần (lớn nhất = 1); order = 1 xếp hạng tăng dần (nhỏ nhất = 1)." },
+        { topic: "Biểu đồ (Charts)", q: "Để thêm bảng số liệu chi tiết nằm ngay bên dưới trục hoành của biểu đồ cột (Column Chart), bạn bật thành phần biểu đồ nào?", opts: ["Data Table (Chart Design > Add Chart Element > Data Table)", "Data Labels", "Gridlines", "Legend"], ans: 0, exp: "Data Table hiển thị lưới số liệu nguồn gắn liền dưới chân biểu đồ." },
+        { topic: "In ấn (Page Setup)", q: "Khi trang tính có nhiều lỗi công thức như `#DIV/0!` hoặc `#N/A`, làm thế nào để khi in ra giấy các ô lỗi này hiển thị thành khoảng trắng sạch sẽ mà không cần sửa công thức trên Sheet?", opts: ["Page Setup > thẻ Sheet > mục 'Cell errors as' > chọn '<blank>'", "Home > Find & Select > Replace #N/A", "File > Options > Display > Hide Errors", "Conditional Formatting > tô chữ màu trắng"], ans: 0, exp: "Trong Page Setup > thẻ Sheet có mục 'Cell errors as' cho phép in lỗi dưới dạng <blank>, -- hoặc #N/A." },
+        { topic: "Quản lý trang tính", q: "Trong Excel, làm thế nào để ẩn một Sheet ở mức 'Very Hidden' sao cho người dùng nhấp chuột phải vào thanh Sheet Tab cũng KHÔNG thể chọn 'Unhide' để mở lại?", opts: ["Mở cửa sổ VBA Editor (Alt + F11) > chọn Sheet đó > đổi thuộc tính Visible thành '2 - xlSheetVeryHidden'", "Nhấp chuột phải vào Sheet > Hide > đặt mật khẩu", "Review > Protect Sheet > Hide Tab", "File > Info > Encrypt Sheet"], ans: 0, exp: "xlSheetVeryHidden ẩn trang tính hoàn toàn khỏi hộp thoại Unhide thông thường trên giao diện." },
+        { topic: "Hàm logic", q: "Khi viết công thức =IF(B2=\"\", \"Chưa nhập\", B2*1000), mục đích của biểu thức `B2=\"\"` là gì?", opts: ["Kiểm tra xem ô B2 có đang để trống (rỗng) hay không", "Kiểm tra xem ô B2 có chứa dấu ngoặc kép hay không", "Gán giá trị rỗng cho ô B2", "Kiểm tra xem ô B2 có bằng số 0 hay không"], ans: 0, exp: "Hai dấu ngoặc kép liền nhau (\"\") biểu thị chuỗi rỗng (Empty string)." },
+        { topic: "Chèn đối tượng", q: "Để hiển thị đồng loạt tất cả các ghi chú (Notes) đang nằm ẩn trong các ô trên trang tính để dễ đọc hoặc in ấn, bạn nhấn nút nào trên thẻ Review?", opts: ["Show All Notes (hoặc Show/Hide Note)", "Show Comments", "Track Changes", "Inspect Document"], ans: 0, exp: "Thẻ Review > nhóm Notes > Show All Notes bật hiển thị toàn bộ hộp ghi chú trên trang tính." },
+        { topic: "Công thức & Kiểm tra", q: "Khi ô hiện hành đang có mũi tên màu xanh dương chỉ tới do lệnh 'Trace Precedents', bạn muốn xóa sạch các mũi tên kiểm toán này đi thì nhấn nút nào?", opts: ["Formulas > nhóm Formula Auditing > Remove Arrows", "Nhấn phím Esc", "Home > Clear > Clear Formats", "View > Reset Window"], ans: 0, exp: "Nút Remove Arrows xóa toàn bộ mũi tên Trace Precedents và Trace Dependents." },
+        { topic: "Định dạng có điều kiện", q: "Khi dùng 'Icon Sets' (bộ 3 đèn giao thông Xanh - Vàng - Đỏ) trong Conditional Formatting, mặc định Excel chia ngưỡng 3 màu dựa theo quy tắc nào?", opts: ["Chia đều theo tỷ lệ phần trăm (Percent): >=67% là Xanh, 33%–67% là Vàng, <33% là Đỏ", "Chia theo giá trị cố định: >100 là Xanh, 50–100 là Vàng, <50 là Đỏ", "Tô màu ngẫu nhiên theo thứ tự hàng", "Chỉ tô màu cho giá trị lớn nhất và nhỏ nhất"], ans: 0, exp: "Mặc định Icon Sets dùng ngưỡng Percent (67% và 33%); có thể đổi sang Number, Formula hoặc Percentile trong Manage Rules." },
+        { topic: "Dữ liệu (Data Tools)", q: "Sau khi sử dụng công cụ 'Subtotal' (Data > Outline > Subtotal) để tạo các dòng tổng phụ theo từng phòng ban, làm thế nào để gỡ bỏ toàn bộ các dòng Subtotal và thanh phân cấp Outline trở về bảng gốc?", opts: ["Data > Subtotal > nhấn nút 'Remove All'", "Bôi đen các dòng Subtotal và nhấn Delete", "Data > Ungroup > Clear Outline", "Home > Clear > Clear All"], ans: 0, exp: "Mở lại hộp thoại Subtotal và nhấn 'Remove All' sẽ xóa sạch các dòng tổng phụ và khôi phục bảng gốc." },
+        { topic: "Tùy chỉnh Excel", q: "Khi mở một tệp Excel tải về từ Internet, thanh màu vàng 'Protected View' xuất hiện ở trên cùng và khóa mọi chức năng chỉnh sửa. Bạn cần nhấn nút nào để làm việc với tệp?", opts: ["Enable Editing", "Enable Content", "Unprotect Sheet", "Save As Copy"], ans: 0, exp: "Enable Editing thoát chế độ xem an toàn Protected View; Enable Content kích hoạt Macro hoặc liên kết ngoài." },
+
+        // --- CA 2: CÂU 51 - 100 ---
+        { topic: "Hàm tra cứu", q: "Trong hàm =XLOOKUP(E2, B2:B50, A2:A50, \"Không thấy\", 0), tham số thứ 4 `\"Không thấy\"` đảm nhận chức năng của hàm truyền thống nào?", opts: ["IFERROR / IFNA", "ISBLANK", "EXACT", "CHOOSE"], ans: 0, exp: "XLOOKUP tích hợp sẵn tham số [if_not_found] ở vị trí thứ 4 nên không cần bọc thêm hàm IFERROR bên ngoài." },
+        { topic: "Hàm tham chiếu", q: "Để thực hiện tra cứu hai chiều (tìm giao điểm giữa 'Tên Sản Phẩm' ở cột A và 'Tên Quý' ở hàng 1) trong bảng B2:E20, công thức nào chuẩn xác nhất?", opts: ["=INDEX(B2:E20, MATCH(H2, A2:A20, 0), MATCH(I2, B1:E1, 0))", "=VLOOKUP(H2, A1:E20, I2, FALSE)", "=HLOOKUP(I2, B1:E20, H2, FALSE)", "=INDEX(A1:E20, H2, I2)"], ans: 0, exp: "INDEX(array, row_num, column_num) kết hợp hai hàm MATCH (một tìm hàng, một tìm cột) thực hiện tra cứu ma trận hai chiều." },
+        { topic: "Hàm điều kiện nhiều tiêu chí", q: "Công thức =SUMIFS(E2:E50, C2:C50, \">=01/01/2026\", C2:C50, \"<=31/03/2026\") thực hiện tính toán gì?", opts: ["Tính tổng cột E cho các giao dịch có ngày ở cột C nằm trong Quý 1 năm 2026", "Đếm số ngày trong Quý 1 năm 2026", "Báo lỗi vì không được dùng cùng một vùng điều kiện C2:C50 hai lần", "Tính trung bình doanh thu Quý 1 năm 2026"], ans: 0, exp: "SUMIFS cho phép áp dụng nhiều điều kiện chặn trên và chặn dưới trên cùng một cột điều kiện." },
+        { topic: "Công thức & Lỗi", q: "Lỗi `#VALUE!` xuất hiện khi bạn thực hiện phép cộng `=A2+B2` trong trường hợp nào sau đây?", opts: ["Khi ô A2 chứa số 100 nhưng ô B2 chứa chuỗi văn bản chữ cái như 'Chưa có'", "Khi ô B2 là ô trống hoàn toàn", "Khi ô B2 bằng số 0", "Khi cột C quá hẹp"], ans: 0, exp: "Toán tử số học (+, -, *, /) gặp dữ liệu kiểu Text không ép kiểu được sẽ sinh lỗi #VALUE! (trong khi hàm =SUM(A2,B2) sẽ tự bỏ qua chữ)." },
+        { topic: "Công thức & Lỗi", q: "Lỗi `#NUM!` xuất hiện trong trường hợp nào dưới đây?", opts: ["Khi tính căn bậc hai của một số âm (ví dụ: =SQRT(-9)) hoặc kết quả số vượt quá giới hạn biểu diễn của Excel", "Khi viết sai tên hàm", "Khi chia cho 0", "Khi không tìm thấy giá trị trong VLOOKUP"], ans: 0, exp: "#NUM! báo hiệu giá trị số học không hợp lệ đối với phép toán hoặc hàm." },
+        { topic: "Hàm xử lý chuỗi", q: "Sự khác biệt chính giữa hàm `TEXTJOIN(\", \", TRUE, A2:D2)` và hàm `CONCAT(A2:D2)` là gì?", opts: ["TEXTJOIN cho phép chèn tự động ký tự phân cách (như dấu phẩy) giữa các ô và tự động bỏ qua các ô trống (tham số TRUE)", "CONCAT chỉ nối được tối đa 2 ô", "TEXTJOIN chỉ dùng được cho dữ liệu số", "Hai hàm này có chức năng hoàn toàn giống nhau"], ans: 0, exp: "TEXTJOIN(delimiter, ignore_empty, text1, ...) vượt trội nhờ tự chèn dấu phân cách và bỏ qua ô rỗng." },
+        { topic: "Hàm xử lý chuỗi", q: "Để thay thế toàn bộ dấu gạch ngang '-' thành dấu gạch chéo '/' trong chuỗi ở ô A2 (ví dụ: '12-05-2026' thành '12/05/2026'), bạn dùng hàm nào?", opts: ['=SUBSTITUTE(A2, "-", "/")', '=REPLACE(A2, "-", "/")', '=CHANGE(A2, "-", "/")', '=TRIM(A2, "-", "/")'], ans: 0, exp: "SUBSTITUTE thay thế theo nội dung chuỗi tìm thấy; REPLACE thay thế dựa theo vị trí chỉ số ký tự." },
+        { topic: "Dán đặc biệt (Paste Special)", q: "Bạn có một cột đơn giá (B2:B20) và muốn tăng đồng loạt tất cả các giá trị trong cột đó lên 10% (nhân với 1.1) mà không cần tạo cột phụ. Bạn gõ 1.1 vào một ô trống, sao chép ô đó, bôi đen B2:B20 và chọn gì trong hộp thoại Paste Special?", opts: ["Operation: Multiply", "Operation: Add", "Transpose", "Paste Link"], ans: 0, exp: "Mục Operation trong Paste Special (Add, Subtract, Multiply, Divide) thực hiện phép tính toán học trực tiếp lên vùng đích." },
+        { topic: "Dán đặc biệt (Paste Special)", q: "Tùy chọn 'Skip blanks' trong hộp thoại Paste Special có tác dụng gì khi dán một cột dữ liệu mới đè lên cột dữ liệu cũ?", opts: ["Không dán đè các ô trống từ vùng nguồn lên vùng đích (giữ nguyên giá trị cũ ở những vị trí mà vùng nguồn bị bỏ trống)", "Xóa sạch toàn bộ các ô trống trong vùng đích", "Tự động điền số 0 vào các ô trống", "Chuyển các ô trống sang cuối bảng"], ans: 0, exp: "Skip blanks bảo vệ dữ liệu hiện có tại vùng đích khỏi bị ghi đè bởi các ô rỗng từ vùng sao chép." },
+        { topic: "PivotTable", q: "Để hiển thị số liệu doanh thu trong PivotTable dưới dạng tỷ trọng phần trăm so với tổng doanh thu toàn công ty (% of Grand Total) thay vì con số tuyệt đối, bạn thiết lập ở đâu?", opts: ["Nhấp chuột phải vào ô số liệu > Show Values As > % of Grand Total", "Summarize Values By > Percentage", "Đổi định dạng ô sang Percentage (%)", "Dùng công thức chia thủ công bên ngoài PivotTable"], ans: 0, exp: "Show Values As cung cấp nhiều phép tính tỷ trọng (% of Grand Total, % of Column Total, % of Row Total, Running Total In...)." },
+        { topic: "PivotTable", q: "Công cụ 'Timeline' (Insert > Filters > Timeline) trong PivotTable khác với 'Slicer' ở điểm nào?", opts: ["Timeline chỉ hoạt động với các trường dữ liệu định dạng NGÀY THÁNG (Date) và cho phép kéo thanh trượt lọc theo Ngày, Tháng, Quý, Năm", "Timeline dùng để đo thời gian làm bài thi", "Timeline chỉ lọc được dữ liệu dạng chữ", "Timeline không thể kết nối với nhiều PivotTable cùng lúc"], ans: 0, exp: "Timeline là bộ lọc trực quan chuyên biệt cho trường thời gian (Date)." },
+        { topic: "Biểu đồ (Charts)", q: "Khi thêm đường xu hướng (Trendline) cho biểu đồ, tùy chọn nào trên ngăn 'Format Trendline' cho phép hiển thị phương trình hồi quy (ví dụ: y = 2.5x + 10) ngay trên biểu đồ?", opts: ["Display Equation on chart", "Display R-squared value on chart", "Set Intercept", "Forecast Forward"], ans: 0, exp: "Tích chọn 'Display Equation on chart' để hiển thị phương trình đường xu hướng trên biểu đồ." },
+        { topic: "Biểu đồ (Charts)", q: "Để thay đổi màu sắc đồng bộ của toàn bộ biểu đồ sang bảng màu đơn sắc 'Monochromatic Palette 2' theo chuẩn MOS, bạn chọn biểu đồ và nhấn nút nào?", opts: ["Chart Design > nhóm Chart Styles > Change Colors", "Format > Shape Fill", "Page Layout > Themes > Colors", "Home > Fill Color"], ans: 0, exp: "Thẻ ngữ cảnh Chart Design > Change Colors chứa các nhóm bảng màu Colorful và Monochromatic." },
+        { topic: "Hàm ngày tháng", q: "Hàm =WORKDAY(start_date, 10) trả về kết quả gì?", opts: ["Ngày làm việc chính xác sau 10 ngày làm việc (tự động bỏ qua các ngày thứ Bảy và Chủ Nhật)", "Số ngày làm việc giữa hai mốc ngày", "Tổng số giờ làm việc trong 10 ngày", "Ngày thứ 10 của tháng hiện tại"], ans: 0, exp: "WORKDAY tính ngày đến hạn (deadline) sau N ngày làm việc; NETWORKDAYS đếm số ngày làm việc giữa 2 mốc." },
+        { topic: "Hàm ngày tháng", q: "Ô A2 chứa giá trị ngày tháng '21/11/2026'. Công thức =TEXT(A2, \"dddd\") trả về kết quả gì (trên hệ thống tiếng Anh)?", opts: ["Saturday", "Sat", "21", "November"], ans: 0, exp: "Mã \"ddd\" trả về tên thứ viết tắt (Sat); mã \"dddd\" trả về tên thứ đầy đủ (Saturday)." },
+        { topic: "Quản lý trang tính", q: "Để di chuyển hoặc sao chép một Sheet từ Workbook hiện tại sang một Workbook KHÁC đang mở, bạn nhấp chuột phải vào tên Sheet > Move or Copy... và chỉnh mục nào trước tiên?", opts: ["Mục 'To book:' (chọn tên Workbook đích hoặc '(new book)')", "Mục 'Before sheet:'", "Tích chọn 'Create a copy'", "Nhấn phím Ctrl + C"], ans: 0, exp: "Trong hộp thoại Move or Copy, mục 'To book' chọn tệp đích, và tích 'Create a copy' nếu muốn giữ lại bản gốc." },
+        { topic: "In ấn (Page Setup)", q: "Trong Custom Header / Custom Footer của Excel, mã định dạng `&[Page]` và `&[Pages]` lần lượt hiển thị thông tin gì?", opts: ["Số trang hiện tại và Tổng số trang của tài liệu in", "Tên tệp Excel và Tên trang tính (Sheet)", "Ngày hiện tại và Giờ hiện tại", "Đường dẫn thư mục lưu tệp"], ans: 0, exp: "&[Page] = số trang hiện tại; &[Pages] = tổng số trang; &[Tab] = tên Sheet; &[File] = tên tệp." },
+        { topic: "In ấn (Page Setup)", q: "Tùy chọn 'Black and white' trong hộp thoại Page Setup > thẻ Sheet (mục Print) có tác dụng gì?", opts: ["In toàn bộ trang tính dưới dạng đen trắng thuần túy (bỏ qua màu nền và màu chữ) nhằm tiết kiệm mực và in nhanh hơn", "Đổi giao diện màn hình Excel sang màu đen trắng", "Chỉ in các ô có chữ màu đen", "Xóa toàn bộ định dạng màu của tệp"], ans: 0, exp: "Black and white loại bỏ màu sắc khi gửi lệnh tới máy in nhưng không làm thay đổi màu sắc trên tệp gốc." },
+        { topic: "Dữ liệu (Outline)", q: "Khi bảng dữ liệu đã có sẵn các công thức tổng hợp `=SUM(...)` ở cuối mỗi nhóm hàng và cuối mỗi nhóm cột, lệnh nào trong Data > Outline tự động nhận diện cấu trúc công thức để tạo các nút thu gọn (+/-) mà không cần chọn thủ công từng vùng?", opts: ["Auto Outline (Data > Group > Auto Outline)", "Subtotal", "Consolidate", "Show Detail"], ans: 0, exp: "Auto Outline tự động phân tích hướng tham chiếu của các hàm SUM/SUBTOTAL để dựng cây phân cấp nhóm." },
+        { topic: "Định dạng số", q: "Nếu một cột chứa toàn bộ các số đã bị nhập dưới dạng Text (có tam giác nhỏ màu xanh lá ở góc trên bên trái mỗi ô), cách nhanh nhất để chuyển hàng loạt cả cột về dạng Số (Number) chuẩn là gì?", opts: ["Bôi đen toàn bộ các ô lỗi đó, nhấp vào biểu tượng dấu chấm than màu vàng bên cạnh và chọn 'Convert to Number'", "Đổi định dạng trên thẻ Home từ Text sang Number (không cần thao tác gì thêm)", "Dùng hàm =TEXT() cho cả cột", "Nhấn phím F2 trên ô đầu tiên"], ans: 0, exp: "Chỉ đổi định dạng trên thẻ Home không tự ép kiểu chuỗi Text có sẵn; dùng Smart Tag 'Convert to Number' hoặc Paste Special > Add 0 sẽ chuyển đổi hàng loạt." },
+        { topic: "Xác thực dữ liệu", q: "Để tìm và khoanh tròn màu đỏ tất cả các ô đang chứa dữ liệu vi phạm quy tắc Data Validation (do dữ liệu được nhập trước khi đặt quy tắc), bạn chọn lệnh nào?", opts: ["Data > mũi tên cạnh Data Validation > Circle Invalid Data", "Home > Conditional Formatting > Highlight Errors", "Formulas > Error Checking", "Review > Inspect Document"], ans: 0, exp: "Circle Invalid Data vẽ vòng tròn elip màu đỏ quanh mọi ô có giá trị nằm ngoài điều kiện Data Validation." },
+        { topic: "Hàm toán học", q: "Hàm =MOD(17, 5) trả về kết quả là bao nhiêu?", opts: ["2", "3", "3.4", "12"], ans: 0, exp: "MOD(number, divisor) trả về số dư của phép chia: 17 chia 5 được 3 dư 2." },
+        { topic: "Sắp xếp & Lọc", q: "Trong AutoFilter, tùy chọn lọc 'Top 10...' (Number Filters > Top 10) có thể lọc được những dạng dữ liệu nào?", opts: ["Lọc Top hoặc Bottom theo số lượng phần tử (Items) hoặc theo tỷ lệ phần trăm (Percent)", "Chỉ lọc duy nhất 10 giá trị lớn nhất", "Chỉ lọc các số chia hết cho 10", "Chỉ lọc được các giá trị bằng 10"], ans: 0, exp: "Hộp thoại Top 10 AutoFilter cho phép chọn Top/Bottom, nhập số lượng N bất kỳ, và chọn đơn vị Items hoặc Percent." },
+        { topic: "Quản lý dữ liệu", q: "Tính năng 'Forecast Sheet' (Data > Forecast > Forecast Sheet) yêu cầu dữ liệu đầu vào phải có cấu trúc như thế nào?", opts: ["Một cột mốc thời gian (ngày/tháng/năm) có khoảng cách đều đặn và một cột giá trị số tương ứng", "Ít nhất 3 bảng PivotTable khác nhau", "Dữ liệu phải được sắp xếp giảm dần", "Chỉ hoạt động với dữ liệu dạng văn bản"], ans: 0, exp: "Forecast Sheet sử dụng thuật toán làm mũ ba (AAA) trên chuỗi thời gian đều đặn để dự báo xu hướng tương lai kèm khoảng tin cậy." },
+        { topic: "Tùy chỉnh Excel", q: "Để thay đổi số lượng trang tính (Sheets) mặc định được tạo ra mỗi khi mở một Workbook mới (ví dụ: từ 1 Sheet thành 3 Sheets), bạn thiết lập ở đâu?", opts: ["File > Options > General > mục 'When creating new workbooks' > Include this many sheets", "Insert > Worksheet > Set Default", "File > Options > Save > Default Sheets", "View > Workbook Views > Default Count"], ans: 0, exp: "File > Options > General > Include this many sheets quy định số Sheet mặc định của Workbook mới." },
+        { topic: "Bảo vệ dữ liệu", q: "Để đánh dấu một tệp Excel là phiên bản hoàn chỉnh cuối cùng nhằm khuyến cáo người nhận chỉ nên đọc mà không chỉnh sửa (có thể tắt dễ dàng bằng nút Edit Anyway), bạn chọn lệnh nào?", opts: ["File > Info > Protect Workbook > Mark as Final", "File > Info > Protect Workbook > Encrypt with Password", "Review > Protect Sheet", "File > Save As > Read-Only Recommended"], ans: 0, exp: "Mark as Final gắn nhãn hoàn tất và chuyển tệp sang trạng thái chỉ đọc mềm (không yêu cầu mật khẩu)." },
+        { topic: "Hàm logic", q: "Hàm =XOR(TRUE, TRUE, FALSE) trả về kết quả nào?", opts: ["FALSE", "TRUE", "#VALUE!", "0"], ans: 0, exp: "XOR (Exclusive OR) trả về TRUE nếu số lượng điều kiện đúng là SỐ LẺ; ở đây có 2 điều kiện TRUE (số chẵn) nên trả về FALSE." },
+        { topic: "Bảng (Table)", q: "Để loại bỏ kiểu định dạng màu sắc của Excel Table (đưa về nền trắng chữ đen) nhưng VẪN GIỮ NGUYÊN tính năng của một Excel Table (vẫn có nút lọc, Total Row và công thức có cấu trúc), bạn chọn gì?", opts: ["Table Design > nhóm Table Styles > chọn kiểu 'None' (Light đầu tiên)", "Table Design > Convert to Range", "Home > Clear > Clear Formats", "Table Design > bỏ tích Banded Rows"], ans: 0, exp: "Chọn mẫu 'None' ở góc trên cùng bên trái thư viện Table Styles sẽ xóa màu sắc mà vẫn giữ nguyên đối tượng Table." },
+        { topic: "Định dạng có điều kiện", q: "Trong cửa sổ 'Conditional Formatting Rules Manager', khi hai quy tắc cùng thỏa mãn trên một ô và đều đặt màu nền khác nhau, quy tắc nào sẽ được áp dụng?", opts: ["Quy tắc nằm ở VỊ TRÍ PHÍA TRÊN trong danh sách ưu tiên (trừ khi quy tắc trên không tích 'Stop If True')", "Quy tắc được tạo ra sau cùng luôn thắng", "Hai màu nền sẽ tự động pha trộn với nhau", "Excel báo lỗi xung đột quy tắc"], ans: 0, exp: "Excel đánh giá quy tắc từ trên xuống dưới; quy tắc đứng trên có độ ưu tiên cao hơn về định dạng xung đột." },
+        { topic: "Phím tắt điều hướng", q: "Tổ hợp phím tắt nào giúp di chuyển nhanh con trỏ tới ô cuối cùng chứa dữ liệu ở góc dưới cùng bên phải của vùng dữ liệu đang làm việc?", opts: ["Ctrl + End", "Ctrl + Down Arrow", "End + Enter", "Alt + End"], ans: 0, exp: "Ctrl + End đưa con trỏ tới giao điểm của hàng cuối cùng và cột cuối cùng đã sử dụng trên Sheet." },
+        { topic: "Hàm thống kê", q: "Hàm =MEDIAN(10, 20, 30, 100) trả về giá trị bao nhiêu?", opts: ["25", "40", "20", "30"], ans: 0, exp: "MEDIAN tìm số trung vị (số đứng giữa khi sắp xếp): với 4 số chẵn phần tử, trung vị là trung bình cộng của hai số giữa (20 + 30) / 2 = 25." },
+        { topic: "Chèn đối tượng", q: "Khi vẽ nhiều hình khối (Shapes) trên trang tính Excel, để khóa các hình khối đó di chuyển và co giãn tỷ lệ theo các ô bên dưới khi bạn thay đổi độ rộng cột hoặc ẩn hàng, bạn mở Format Shape > Properties và chọn tùy chọn nào?", opts: ["Move and size with cells", "Move but don't size with cells", "Don't move or size with cells", "Lock aspect ratio"], ans: 0, exp: "'Move and size with cells' gắn chặt đối tượng đồ họa vào lưới ô bên dưới." },
+        { topic: "Phân tích giả định", q: "Khi sử dụng 'Scenario Manager', để tạo một bảng báo cáo tổng hợp so sánh kết quả của tất cả các kịch bản đã lưu trên một Sheet riêng biệt, bạn nhấn nút nào?", opts: ["Summary...", "Merge...", "Show", "Edit..."], ans: 0, exp: "Nút Summary... trong Scenario Manager xuất bảng tổng hợp Scenario Summary hoặc Scenario PivotTable Report." },
+        { topic: "In ấn (Page Setup)", q: "Khi chọn hướng giấy in 'Landscape' (khổ ngang) trong Page Layout > Orientation, thiết lập này áp dụng cho phạm vi nào?", opts: ["Chỉ áp dụng cho trang tính (Worksheet) hiện tại đang chọn (trừ khi chọn nhiều Sheet cùng lúc)", "Tự động áp dụng cho toàn bộ các Sheet trong tệp Excel", "Chỉ áp dụng cho trang đầu tiên của Sheet", "Áp dụng cho toàn bộ phần mềm Excel"], ans: 0, exp: "Mỗi Worksheet trong Excel lưu trữ cấu hình Page Setup (Margins, Orientation, Size, Print Area) độc lập với nhau." },
+        { topic: "Quản lý trang tính", q: "Khi đang mở 2 cửa sổ của cùng một tệp Excel bằng 'New Window' và chọn 'View Side by Side', tính năng nào tự động được kích hoạt để khi bạn cuộn chuột ở cửa sổ bên trái thì cửa sổ bên phải cũng cuộn theo tương ứng?", opts: ["Synchronous Scrolling", "Freeze Panes", "Split Window", "Reset Window Position"], ans: 0, exp: "Synchronous Scrolling đồng bộ thao tác cuộn trang giữa hai cửa sổ đang xếp song song." },
+        { topic: "Hàm xử lý chuỗi", q: "Hàm =EXACT(\"Excel\", \"excel\") trả về kết quả gì?", opts: ["FALSE", "TRUE", "0", "#VALUE!"], ans: 0, exp: "Khác với phép so sánh bằng thông thường (\"Excel\"=\"excel\" trả về TRUE), hàm EXACT phân biệt chữ HOA và chữ thường nên trả về FALSE." },
+        { topic: "Hàm tìm kiếm", q: "Trong hàm =CHOOSE(2, \"Quý 1\", \"Quý 2\", \"Quý 3\", \"Quý 4\"), kết quả trả về là gì?", opts: ["Quý 2", "Quý 1", "2", "#VALUE!"], ans: 0, exp: "CHOOSE(index_num, value1, value2, ...) chọn giá trị tại vị trí chỉ số index_num (vị trí thứ 2 là 'Quý 2')." },
+        { topic: "Định dạng ô", q: "Để xoay nghiêng tiêu đề cột của bảng một góc 45 độ nhằm tiết kiệm chiều rộng cột mà vẫn đọc rõ tên tiêu đề, bạn chọn nút nào?", opts: ["Home > nhóm Alignment > Orientation (biểu tượng chữ ab nghiêng) > Angle Counterclockwise", "Home > Wrap Text", "Page Layout > Orientation", "Format Cells > Shrink to fit"], ans: 0, exp: "Nút Orientation trên thẻ Home (hoặc Format Cells > thẻ Alignment > Degrees: 45) xoay góc hiển thị chữ trong ô." },
+        { topic: "Sắp xếp & Lọc", q: "Khi sử dụng 'Advanced Filter', vùng điều kiện (Criteria range) quy định nguyên tắc viết điều kiện HOẶC (OR) như thế nào?", opts: ["Viết các điều kiện trên CÁC HÀNG KHÁC NHAU bên dưới tiêu đề cột điều kiện", "Viết các điều kiện trên cùng một hàng ngang", "Dùng hàm OR() trực tiếp trong ô tiêu đề", "Phân tách các điều kiện bằng dấu chấm phẩy (;) trong cùng một ô"], ans: 0, exp: "Trong Advanced Filter: cùng một hàng = điều kiện VÀ (AND); khác hàng = điều kiện HOẶC (OR)." },
+        { topic: "Biểu đồ (Charts)", q: "Loại biểu đồ nào hiển thị phân bố tần suất của dữ liệu số liên tục bằng cách gom nhóm các giá trị vào các khoảng (Bins) liền kề nhau?", opts: ["Histogram", "Scatter (X, Y)", "Radar", "Treemap"], ans: 0, exp: "Histogram (biểu đồ tần suất) tự động chia dải số liệu thành các khoảng (Bins) để đếm mật độ phân bố." },
+        { topic: "Hàm thống kê", q: "Để đếm số lượng các giá trị DUY NHẤT (không trùng lặp) trong vùng A2:A20 bằng hàm mảng hiện đại (Excel 365/2021+), công thức nào ngắn gọn và chuẩn xác nhất?", opts: ["=COUNTA(UNIQUE(A2:A20))", "=COUNTUNIQUE(A2:A20)", "=COUNT(DISTINCT(A2:A20))", "=SUM(UNIQUE(A2:A20))"], ans: 0, exp: "Hàm UNIQUE(A2:A20) lọc ra danh sách các phần tử duy nhất, sau đó COUNTA đếm số phần tử đó." },
+        { topic: "Quản lý dữ liệu", q: "Khi kéo Fill Handle của một ô chứa giá trị số đơn lẻ (ví dụ số `1`), mặc định Excel sẽ sao chép toàn số `1`. Để Excel tự động điền chuỗi tăng dần `1, 2, 3, 4...`, bạn giữ phím gì trong khi kéo Fill Handle?", opts: ["Phím Ctrl", "Phím Shift", "Phím Alt", "Phím Tab"], ans: 0, exp: "Giữ phím Ctrl khi kéo Fill Handle đảo ngược hành vi mặc định (từ Copy Cells sang Fill Series tăng dần)." },
+        { topic: "Thuộc tính tệp", q: "Để kiểm tra xem tệp Excel hiện tại có chứa các tính năng nào không tương thích với các phiên bản Excel cũ (Excel 97-2003) trước khi gửi cho khách hàng, bạn chọn đường dẫn nào?", opts: ["File > Info > Check for Issues > Check Compatibility", "File > Info > Check for Issues > Check Accessibility", "Review > Check Workbook", "Data > Data Validation"], ans: 0, exp: "Check Compatibility quét toàn bộ Workbook để tìm các hàm, định dạng hoặc giới hạn dòng/cột vượt quá chuẩn Excel cũ." },
+        { topic: "Hàm logic", q: "Hàm =NOT(10 > 20) trả về kết quả gì?", opts: ["TRUE", "FALSE", "10", "#VALUE!"], ans: 0, exp: "Biểu thức 10 > 20 là FALSE; hàm NOT đảo ngược kết quả logic thành TRUE." },
+        { topic: "Tùy chỉnh hiển thị", q: "Để thu gọn thanh công cụ Ribbon chỉ hiển thị tên các thẻ (File, Home, Insert...) nhằm mở rộng không gian bảng tính bên dưới, bạn nhấn tổ hợp phím tắt nào?", opts: ["Ctrl + F1", "Alt + F1", "Ctrl + Shift + F1", "F11"], ans: 0, exp: "Ctrl + F1 bật/tắt trạng thái thu gọn Ribbon (Collapse the Ribbon)." },
+        { topic: "Hàm toán học", q: "Để tính tổng ngẫu nhiên một số nguyên nằm trong khoảng từ 10 đến 50 (bao gồm cả 10 và 50) mỗi khi bảng tính tính toán lại, bạn dùng hàm nào?", opts: ["=RANDBETWEEN(10, 50)", "=RAND(10, 50)", "=INT(RAND()*50)", "=RANDOM(10, 50)"], ans: 0, exp: "RANDBETWEEN(bottom, top) sinh số nguyên ngẫu nhiên trong đoạn [bottom, top]; RAND() chỉ sinh số thực trong [0, 1)." },
+        { topic: "Bảo vệ dữ liệu", q: "Để ẩn hoàn toàn công thức trên thanh Formula Bar khi người dùng nhấp vào ô đã được khóa bằng Protect Sheet (người dùng chỉ thấy kết quả hiển thị trong ô), bạn tích chọn thuộc tính nào trong Format Cells > thẻ Protection?", opts: ["Hidden", "Locked", "Hide Formula", "Mask Value"], ans: 0, exp: "Tích chọn cả Locked và Hidden trong Format Cells > Protection trước khi bật Protect Sheet sẽ giấu công thức khỏi thanh Formula Bar." },
+        { topic: "Chèn đối tượng", q: "Để chèn một ảnh chụp nhanh động (Live Snapshot) của vùng bảng tính A1:D10 sang một vị trí khác (khi số liệu ở A1:D10 thay đổi thì ảnh chụp cũng tự động cập nhật theo), bạn dùng tùy chọn dán nào?", opts: ["Home > Paste > Other Paste Options > Linked Picture (biểu tượng bức ảnh có mắt xích)", "Insert > Screenshot", "Paste Values", "Paste Transpose"], ans: 0, exp: "Linked Picture (hoặc công cụ Camera) tạo đối tượng hình ảnh liên kết trực tiếp với vùng ô nguồn." },
+        { topic: "Định dạng số", q: "Để hiển thị số `0.75` dưới dạng phân số `3/4` trong ô Excel, bạn chọn loại định dạng nào trong hộp thoại Format Cells?", opts: ["Fraction (Up to one digit)", "Custom: #/#", "Scientific", "Accounting"], ans: 0, exp: "Định dạng Fraction quy đổi số thập phân thành phân số tối giản." },
+        { topic: "In ấn (Page Setup)", q: "Khi mở hộp thoại 'Print' (Ctrl + P), làm thế nào để in tất cả các trang tính (Worksheets) đang có trong toàn bộ tệp Excel cùng một lúc thay vì chỉ in Sheet hiện tại?", opts: ["Tại mục Settings, đổi 'Print Active Sheets' thành 'Print Entire Workbook'", "Chọn 'Print Selection'", "Tích chọn 'Collate'", "Đổi Page Orientation sang Landscape"], ans: 0, exp: "Print Entire Workbook gửi lệnh in cho tất cả các trang tính không bị ẩn trong toàn bộ sổ tính." }
+      ];
+
+      const LETTERS = ["A", "B", "C", "D"];
+      const INITIAL_CAUHOI = [
+        ...RAW_WORD_BANK.map((item, idx) => ({
+          id_cauhoi: "W" + String(idx + 1).padStart(3, "0"),
+          id_chuong: idx < 50 ? "WORD_CA1" : "WORD_CA2",
+          id_monhoc: "MOS_WORD",
+          chuDe: item.topic,
+          noidung: item.q,
+          loai_cauhoi: "motDapAn",
+          optionA: item.opts[0],
+          optionB: item.opts[1],
+          optionC: item.opts[2],
+          optionD: item.opts[3],
+          correct: LETTERS[item.ans],
+          explanation: item.exp,
+          doKho: "kho"
+        })),
+        ...RAW_EXCEL_BANK.map((item, idx) => ({
+          id_cauhoi: "E" + String(idx + 1).padStart(3, "0"),
+          id_chuong: idx < 50 ? "EXCEL_CA1" : "EXCEL_CA2",
+          id_monhoc: "MOS_EXCEL",
+          chuDe: item.topic,
+          noidung: item.q,
+          loai_cauhoi: "motDapAn",
+          optionA: item.opts[0],
+          optionB: item.opts[1],
+          optionC: item.opts[2],
+          optionD: item.opts[3],
+          correct: LETTERS[item.ans],
+          explanation: item.exp,
+          doKho: "kho"
+        }))
+      ];
+
+      const TODAY_STR = new Date().toISOString().split("T")[0];
+
+      const INITIAL_DETHI = [
+        { id_dethi: "DE_WORD_CA1", id_monhoc: "MOS_WORD", ten_dethi: "Đề MOS Word - Ca 1 (Câu 01 - 50 • Nâng Cao)", thoi_gian_lam_bai: 40, tongCau: 50, subject: "MOS Word", passScore: 700, description: "50 câu hỏi tình huống bẫy chuẩn MOS Word Ca 1 (Trộn câu & Trộn đáp án)" },
+        { id_dethi: "DE_WORD_CA2", id_monhoc: "MOS_WORD", ten_dethi: "Đề MOS Word - Ca 2 (Câu 51 - 100 • Nâng Cao)", thoi_gian_lam_bai: 40, tongCau: 50, subject: "MOS Word", passScore: 700, description: "50 câu hỏi tình huống bẫy chuẩn MOS Word Ca 2 độc lập 100%" },
+        { id_dethi: "DE_EXCEL_CA1", id_monhoc: "MOS_EXCEL", ten_dethi: "Đề MOS Excel - Ca 1 (Câu 01 - 50 • Nâng Cao)", thoi_gian_lam_bai: 40, tongCau: 50, subject: "MOS Excel", passScore: 700, description: "50 câu hỏi tình huống bẫy chuẩn MOS Excel Ca 1 (Trộn câu & Trộn đáp án)" },
+        { id_dethi: "DE_EXCEL_CA2", id_monhoc: "MOS_EXCEL", ten_dethi: "Đề MOS Excel - Ca 2 (Câu 51 - 100 • Nâng Cao)", thoi_gian_lam_bai: 40, tongCau: 50, subject: "MOS Excel", passScore: 700, description: "50 câu hỏi tình huống bẫy chuẩn MOS Excel Ca 2 độc lập 100%" }
+      ];
+
+      const INITIAL_MATRAN = [
+        { id_dethi: "DE_WORD_CA1", id_chuong: "WORD_CA1", so_luong: 50 },
+        { id_dethi: "DE_WORD_CA2", id_chuong: "WORD_CA2", so_luong: 50 },
+        { id_dethi: "DE_EXCEL_CA1", id_chuong: "EXCEL_CA1", so_luong: 50 },
+        { id_dethi: "DE_EXCEL_CA2", id_chuong: "EXCEL_CA2", so_luong: 50 }
+      ];
+
+      const INITIAL_CATHI = [
+        { id_cathi: "CA_W1", id_kythi: "KY2026_MOS", id_dethi: "DE_WORD_CA1", id_phongthi: "PM01", id_monhoc: "MOS_WORD", tenCa: "📘 MOS Word — Ca Thi Số 1 (50 Câu Nâng Cao)", thoigian_batdau: "07:30", thoigian_ketthuc: "09:00", ngayThi: TODAY_STR, matKhauCaThi: "1111", lop: ["MOS_K01", "MOS_K02"] },
+        { id_cathi: "CA_W2", id_kythi: "KY2026_MOS", id_dethi: "DE_WORD_CA2", id_phongthi: "PM01", id_monhoc: "MOS_WORD", tenCa: "📘 MOS Word — Ca Thi Số 2 (50 Câu Nâng Cao)", thoigian_batdau: "09:30", thoigian_ketthuc: "11:00", ngayThi: TODAY_STR, matKhauCaThi: "1111", lop: ["MOS_K01", "MOS_K02"] },
+        { id_cathi: "CA_E1", id_kythi: "KY2026_MOS", id_dethi: "DE_EXCEL_CA1", id_phongthi: "PM02", id_monhoc: "MOS_EXCEL", tenCa: "📗 MOS Excel — Ca Thi Số 1 (50 Câu Nâng Cao)", thoigian_batdau: "13:30", thoigian_ketthuc: "15:00", ngayThi: TODAY_STR, matKhauCaThi: "1111", lop: ["MOS_K01", "MOS_K02"] },
+        { id_cathi: "CA_E2", id_kythi: "KY2026_MOS", id_dethi: "DE_EXCEL_CA2", id_phongthi: "PM02", id_monhoc: "MOS_EXCEL", tenCa: "📗 MOS Excel — Ca Thi Số 2 (50 Câu Nâng Cao)", thoigian_batdau: "15:30", thoigian_ketthuc: "17:00", ngayThi: TODAY_STR, matKhauCaThi: "1111", lop: ["MOS_K01", "MOS_K02"] }
+      ];
+
+      // Hàm trộn phương án A/B/C/D của một câu hỏi và cập nhật lại đáp án đúng tương ứng
+      function shuffleQuestionOptions(q) {
+        const rightText = q["option" + q.correct];
+        const rawOpts = [q.optionA, q.optionB, q.optionC, q.optionD];
+        const shuffled = fisherYatesShuffle(rawOpts);
+        const newCorrectIdx = shuffled.indexOf(rightText);
+        return Object.assign({}, q, {
+          optionA: shuffled[0],
+          optionB: shuffled[1],
+          optionC: shuffled[2],
+          optionD: shuffled[3],
+          correct: LETTERS[newCorrectIdx >= 0 ? newCorrectIdx : 0]
+        });
+      }
+
+      // Xuất Excel (có fallback CSV UTF-8 BOM nếu offline)
+      function exportToExcel(sheets, filename) {
+        if (window.XLSX) {
+          const wb = XLSX.utils.book_new();
+          sheets.forEach(sheet => {
+            const ws = XLSX.utils.aoa_to_sheet(sheet.data);
+            XLSX.utils.book_append_sheet(wb, ws, sheet.name);
+          });
+          XLSX.writeFile(wb, filename);
+        } else {
+          const csvRows = sheets[0].data.map(r => r.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(","));
+          const blob = new Blob(["\uFEFF" + csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = filename.replace(".xlsx", ".csv");
+          a.click();
+        }
+      }
+
+      function TestOnlineApp() {
+        const [users] = useState(INITIAL_USERS);
+        const [cauhoi] = useState(INITIAL_CAUHOI);
+        const [ketqua, setKetqua] = useState([]);
+        const [chuong] = useState(INITIAL_CHUONG);
+        const [dethi] = useState(INITIAL_DETHI);
+        const [cathi] = useState(INITIAL_CATHI);
+        const [matran] = useState(INITIAL_MATRAN);
+
+        // Cấu hình chống lộ đề (mặc định BẬT cả trộn câu hỏi và trộn phương án trả lời)
+        const [shuffleConfig, setShuffleConfig] = useState({
+          shuffleQuestions: true,
+          shuffleOptions: true
+        });
+
+        const [currentUser, setCurrentUser] = useState(null);
+        const [loginForm, setLoginForm] = useState({ maSV: "", matKhau: "", showPass: false });
+        const [loginError, setLoginError] = useState("");
+
+        const [studentView, setStudentView] = useState("list");
+        const [selectedCa, setSelectedCa] = useState(null);
+        const [caPassModal, setCaPassModal] = useState({ pass: "", show: false, error: "" });
+        const [resumeModal, setResumeModal] = useState({ personal: "", ca: "", show1: false, show2: false, error: "" });
+
+        const [examQuestions, setExamQuestions] = useState([]);
+        const [examCode, setExamCode] = useState("");
+        const [answers, setAnswers] = useState({});
+        const [currentIndex, setCurrentIndex] = useState(0);
+        const [flaggedSet, setFlaggedSet] = useState(new Set());
+        const [timeLeft, setTimeLeft] = useState(2400);
+        const [startTime, setStartTime] = useState(0);
+        const [latestResult, setLatestResult] = useState(null);
+        const [savedExamState, setSavedExamState] = useState(null);
+
+        const [adminTab, setAdminTab] = useState("dashboard");
+        const [filterMon, setFilterMon] = useState("all");
+        const [filterChuong, setFilterChuong] = useState("all");
+        const [filterLop] = useState("all");
+        const [searchQ, setSearchQ] = useState("");
+
+        const timerRef = useRef(null);
+        const latestStateRef = useRef({ answers: {}, examQuestions: [], currentUser: null, selectedCa: null, startTime: 0, examCode: "" });
+        latestStateRef.current = { answers, examQuestions, currentUser, selectedCa, startTime, examCode };
+
+        const handleLogin = () => {
+          const u = users.find(
+            item => item.mssv.toLowerCase() === loginForm.maSV.trim().toLowerCase() && item.matKhau === loginForm.matKhau
+          );
+          if (!u) {
+            setLoginError("Tài khoản hoặc mật khẩu không đúng (Thử: SV001 / 123 hoặc admin / admin123)");
+            return;
+          }
+          setLoginError("");
+          setCurrentUser(u);
+          setStudentView("list");
+        };
+
+        const availableCathi = useMemo(() => {
+          if (!currentUser) return [];
+          return cathi.filter(c => c.ngayThi === TODAY_STR && (c.lop.includes(currentUser.lop) || currentUser.vaiTro !== "sinhvien"));
+        }, [currentUser, cathi]);
+
+        const handleVerifyCaPass = () => {
+          if (!selectedCa) return;
+          if (caPassModal.pass !== selectedCa.matKhauCaThi) {
+            setCaPassModal(prev => ({ ...prev, error: "Mật khẩu ca thi không đúng (Mặc định: 1111)" }));
+            return;
+          }
+          setCaPassModal({ pass: "", show: false, error: "" });
+          setStudentView("confirm");
+        };
+
+        const handleStartExam = () => {
+          if (!selectedCa || !currentUser) return;
+          const deInfo = dethi.find(d => d.id_dethi === selectedCa.id_dethi);
+          const totalQ = (deInfo && deInfo.tongCau) || 50;
+          const durationSec = ((deInfo && deInfo.thoi_gian_lam_bai) || 40) * 60;
+
+          let picked = [];
+          matran.filter(m => m.id_dethi === selectedCa.id_dethi).forEach(m => {
+            const pool = cauhoi.filter(q => q.id_chuong === m.id_chuong).slice(0, m.so_luong);
+            picked = picked.concat(pool);
+          });
+
+          picked = picked.slice(0, totalQ);
+
+          // 1. Trộn thứ tự câu hỏi trong phạm vi ca thi
+          if (shuffleConfig.shuffleQuestions) {
+            picked = fisherYatesShuffle(picked);
+          }
+
+          // 2. Trộn thứ tự 4 phương án trả lời A/B/C/D cho từng câu hỏi và cập nhật đáp án đúng mới
+          if (shuffleConfig.shuffleOptions) {
+            picked = picked.map(q => shuffleQuestionOptions(q));
+          }
+
+          const randomMaDe = "MD-" + (100 + Math.floor(Math.random() * 900));
+          setExamCode(randomMaDe);
+          setExamQuestions(picked);
+          setAnswers({});
+          setCurrentIndex(0);
+          setFlaggedSet(new Set());
+          setTimeLeft(durationSec);
+          setStartTime(Date.now());
+          setStudentView("exam");
+          setSavedExamState(null);
+        };
+
+        const calculateScore = (ansMap, qList) => {
+          const total = qList.length || 50;
+          let correctCount = 0;
+          qList.forEach((q, idx) => {
+            const chosen = ansMap[q.id_cauhoi] || ansMap[String(idx)] || "";
+            if (chosen === q.correct) correctCount++;
+          });
+          const mosScore = correctCount * 20;
+          const isPassed = mosScore >= 700;
+          const diem10 = Math.round((correctCount / total) * 10 * 100) / 100;
+          const phanTram = Math.round((correctCount / total) * 100);
+          let xepLoai = "Chưa đạt (<700)";
+          if (mosScore >= 900) xepLoai = "Xuất sắc (MOS)";
+          else if (mosScore >= 800) xepLoai = "Giỏi (MOS)";
+          else if (mosScore >= 700) xepLoai = "Đạt chuẩn (PASS)";
+          return { soDung: correctCount, tongCau: total, mosScore, isPassed, diem10, phanTram, xepLoai };
+        };
+
+        const handleSubmitExam = () => {
+          const st = latestStateRef.current;
+          if (!st.currentUser || !st.selectedCa) return;
+          if (timerRef.current) clearInterval(timerRef.current);
+
+          const scoreObj = calculateScore(st.answers, st.examQuestions);
+          const elapsedSec = Math.max(1, Math.floor((Date.now() - st.startTime) / 1000));
+          const mins = Math.floor(elapsedSec / 60);
+          const secs = elapsedSec % 60;
+
+          const record = {
+            id_ketqua: "KQ_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+            id_user: st.currentUser.id_user,
+            mssv: st.currentUser.mssv,
+            hoten: st.currentUser.hoTen,
+            lop: st.currentUser.lop,
+            id_cathi: st.selectedCa.id_cathi,
+            id_dethi: st.selectedCa.id_dethi,
+            id_monhoc: st.selectedCa.id_monhoc,
+            maDe: st.examCode || ("MD-" + (101 + Math.floor(Math.random() * 899))),
+            tongCau: scoreObj.tongCau,
+            soCauDung: scoreObj.soDung,
+            mosScore: scoreObj.mosScore,
+            isPassed: scoreObj.isPassed,
+            diem10: scoreObj.diem10,
+            diemPhanTram: scoreObj.phanTram,
+            xepLoai: scoreObj.xepLoai,
+            trang_thai: "da_nop",
+            nop_bai_luc: new Date().toLocaleString("vi-VN"),
+            thoiGianLamBai: mins + " phút " + secs + " giây",
+            answers: Object.assign({}, st.answers),
+            thoiGianNop: new Date().toISOString()
+          };
+
+          setKetqua(prev => [record, ...prev]);
+          setLatestResult(record);
+          setStudentView("result");
+          setSavedExamState(null);
+        };
+
+        useEffect(() => {
+          if (studentView !== "exam") return;
+          if (timerRef.current) window.clearInterval(timerRef.current);
+          timerRef.current = window.setInterval(() => {
+            setTimeLeft(prev => {
+              if (prev <= 1) {
+                handleSubmitExam();
+                return 0;
+              }
+              return prev - 1;
+            });
+          }, 1000);
+          return () => {
+            if (timerRef.current) clearInterval(timerRef.current);
+          };
+        }, [studentView]);
+
+        useEffect(() => {
+          if (studentView !== "exam") return;
+          const interval = window.setInterval(() => {
+            if (!currentUser || !selectedCa) return;
+            setSavedExamState({
+              maSV: currentUser.id_user,
+              id_cathi: selectedCa.id_cathi,
+              id_dethi: selectedCa.id_dethi,
+              answers,
+              timeLeft,
+              startTime
+            });
+          }, 5000);
+          return () => clearInterval(interval);
+        }, [studentView, answers, timeLeft, startTime, currentUser, selectedCa]);
+
+        const handleResumeExam = () => {
+          if (!currentUser || !selectedCa) return;
+          if (resumeModal.personal !== currentUser.matKhau || resumeModal.ca !== selectedCa.matKhauCaThi) {
+            setResumeModal(prev => ({ ...prev, error: "Sai mật khẩu ca thi hoặc mật khẩu cá nhân" }));
+            return;
+          }
+          if (savedExamState) {
+            setAnswers(savedExamState.answers || {});
+            setTimeLeft(savedExamState.timeLeft || 2400);
+            setStartTime(savedExamState.startTime || Date.now());
+            setStudentView("exam");
+            setResumeModal({ personal: "", ca: "", show1: false, show2: false, error: "" });
+          }
+        };
+
+        const handleExportPersonalExcel = (res) => {
+          const caInfo = cathi.find(c => c.id_cathi === res.id_cathi);
+          const data = [
+            ["excell_ketqua_MOS - Thang 1000 & Thang 10 (Da tron de & tron dap an)"],
+            ["maSV", "hoTen", "lop", "maMon", "ngayThi", "caThi", "phongThi", "maDeNgauNhien", "tongCau", "soCauDung", "diemMOS_1000", "diem10", "diemPhanTram", "xepLoai", "thoiGianNop", "thoiGianLamBai"],
+            [res.mssv, res.hoten, res.lop, res.id_monhoc, (caInfo && caInfo.ngayThi) || TODAY_STR, (caInfo && caInfo.tenCa) || "", (caInfo && caInfo.id_phongthi) || "", res.maDe, res.tongCau, res.soCauDung, res.mosScore, res.diem10, res.diemPhanTram + "%", res.xepLoai, res.nop_bai_luc, res.thoiGianLamBai],
+            [],
+            ["Chi tiet dung sai tung cau theo thu tu ma de " + res.maDe],
+            ["STT", "id_cauhoi", "Chu de", "Noi dung", "Dap an dung (sau tron)", "Dap an chon", "Ket qua", "Giai thich chuan MOS"],
+            ...examQuestions.map((q, idx) => {
+              const chosen = res.answers[q.id_cauhoi] || "";
+              const status = chosen === q.correct ? "Dung" : "Sai";
+              return [idx + 1, q.id_cauhoi, q.chuDe, q.noidung, q.correct, chosen || "Chua lam", status, q.explanation];
+            })
+          ];
+          exportToExcel([{ name: "KetQuaMOS", data }], "excell_ketqua_MOS_" + res.mssv + "_" + TODAY_STR + ".xlsx");
+        };
+
+        const handleExportFullExcel = () => {
+          const filtered = ketqua.filter(k => filterLop === "all" || k.lop === filterLop);
+          const sheet1 = [
+            ["KetQua_Thang10_MOS1000"],
+            ["maSV", "hoTen", "lop", "maMon", "ngayThi", "caThi", "phongThi", "maDe", "tongCau", "soCauDung", "diemMOS_1000", "diem10", "diemPhanTram", "xepLoai", "thoiGianNop", "thoiGianLamBai"],
+            ...filtered.map(k => {
+              const caInfo = cathi.find(c => c.id_cathi === k.id_cathi);
+              return [k.mssv, k.hoten, k.lop, k.id_monhoc, (caInfo && caInfo.ngayThi) || "", (caInfo && caInfo.tenCa) || "", (caInfo && caInfo.id_phongthi) || "", k.maDe, k.tongCau, k.soCauDung, k.mosScore, k.diem10, k.diemPhanTram + "%", k.xepLoai, k.nop_bai_luc, k.thoiGianLamBai];
+            })
+          ];
+          const avg10 = filtered.length ? filtered.reduce((acc, k) => acc + k.diem10, 0) / filtered.length : 0;
+          const avgMOS = filtered.length ? filtered.reduce((acc, k) => acc + k.mosScore, 0) / filtered.length : 0;
+          const passCount = filtered.filter(k => k.mosScore >= 700).length;
+          const sheet2 = [
+            ["ThongKe_MOS"],
+            ["Tong SV", filtered.length],
+            ["Diem TB MOS (thang 1000)", Math.round(avgMOS)],
+            ["Diem TB thang 10", Math.round(avg10 * 100) / 100],
+            ["Ti le dat chuan MOS (>=700)", filtered.length ? Math.round((passCount / filtered.length) * 100) + "%" : "0%"]
+          ];
+          const byClass = {};
+          filtered.forEach(k => {
+            if (!byClass[k.lop]) byClass[k.lop] = { count: 0, total10: 0, totalMOS: 0 };
+            byClass[k.lop].count++;
+            byClass[k.lop].total10 += k.diem10;
+            byClass[k.lop].totalMOS += k.mosScore;
+          });
+          const sheet3 = [
+            ["TheoLop"],
+            ["lop", "So SV", "Diem TB MOS", "Diem TB thang 10"],
+            ...Object.entries(byClass).map(([lop, stat]) => [lop, stat.count, Math.round(stat.totalMOS / stat.count), Math.round((stat.total10 / stat.count) * 100) / 100])
+          ];
+          const qStats = {};
+          cauhoi.forEach(q => { qStats[q.id_cauhoi] = { correct: 0, total: 0, noidung: q.noidung, chuDe: q.chuDe }; });
+          filtered.forEach(k => {
+            Object.entries(k.answers).forEach(([qId, ans]) => {
+              const qObj = cauhoi.find(item => item.id_cauhoi === qId);
+              if (!qObj) return;
+              qStats[qId].total++;
+              if (ans === qObj.correct) qStats[qId].correct++;
+            });
+          });
+          const sheet4 = [
+            ["TheoCau - Ngân hàng 200 câu MOS"],
+            ["id_cauhoi", "Chu de", "Noi dung", "So lan lam", "% dung", "% sai"],
+            ...Object.entries(qStats).map(([qId, st]) => {
+              const pct = st.total ? Math.round((st.correct / st.total) * 100) : 0;
+              return [qId, st.chuDe, st.noidung.slice(0, 70), st.total, pct + "%", (100 - pct) + "%"];
+            })
+          ];
+          exportToExcel(
+            [
+              { name: "KetQua_Thang10", data: sheet1 },
+              { name: "ThongKe", data: sheet2 },
+              { name: "TheoLop", data: sheet3 },
+              { name: "TheoCau", data: sheet4 }
+            ],
+            "excell_ketqua_MOS_" + TODAY_STR + ".xlsx"
+          );
+        };
+
+        const formatTime = (seconds) => {
+          const m = Math.floor(seconds / 60).toString().padStart(2, "0");
+          const s = (seconds % 60).toString().padStart(2, "0");
+          return m + ":" + s;
+        };
+
+        const filteredCauhoi = useMemo(() => {
+          return cauhoi.filter(q => {
+            if (filterMon !== "all" && q.id_monhoc !== filterMon) return false;
+            if (filterChuong !== "all" && q.id_chuong !== filterChuong) return false;
+            if (searchQ && !q.noidung.toLowerCase().includes(searchQ.toLowerCase()) && !q.chuDe.toLowerCase().includes(searchQ.toLowerCase())) return false;
+            return true;
+          });
+        }, [cauhoi, filterMon, filterChuong, searchQ]);
+
+        const curQ = examQuestions[currentIndex] || {};
+
+        return h("div", { className: "min-h-screen bg-[#f6f5ef] text-[#1a1a1a]" },
+          // HEADER
+          h("header", { className: "sticky top-0 z-30 bg-[var(--surface)] border-b border-black" },
+            h("div", { className: "max-w-[1280px] mx-auto px-4 md:px-6 h-[64px] flex items-center justify-between" },
+              h("div", { className: "flex items-center gap-3" },
+                h("div", { className: "w-9 h-9 bg-black text-white font-display font-[800] text-[15px] flex items-center justify-center rounded-[8px]" }, "MOS"),
+                h("div", null,
+                  h("div", { className: "font-display font-[800] text-[18px] leading-[1] tracking-[-0.02em]" }, "TestOnline_MOS"),
+                  h("div", { className: "text-[11px] tracking-[0.1em] uppercase font-[600] text-[#6b6b6b]" }, "Word & Excel • Trộn Câu & Trộn Đáp Án • Độ Khó Cao")
+                )
+              ),
+              h("div", { className: "flex items-center gap-3" },
+                currentUser && h(React.Fragment, null,
+                  h("div", { className: "hidden md:block text-right" },
+                    h("div", { className: "text-[13px] font-[600]" }, currentUser.hoTen + " - " + currentUser.lop),
+                    h("div", { className: "text-[11px] text-[#6b6b6b] uppercase" }, currentUser.vaiTro)
+                  ),
+                  h("button", {
+                    onClick: () => { setCurrentUser(null); setStudentView("list"); },
+                    className: "h-9 px-4 border border-black rounded-full text-[13px] font-[600] hover:bg-black hover:text-white transition"
+                  }, "Đăng xuất")
+                )
+              )
+            )
+          ),
+
+          // MAIN CONTENT
+          h("main", { className: "max-w-[1280px] mx-auto px-4 md:px-6 py-6" },
+            !currentUser ? (
+              // MÀN HÌNH ĐĂNG NHẬP
+              h("div", { className: "grid md:grid-cols-[1.1fr_0.9fr] gap-6 items-stretch" },
+                h("div", { className: "relative bg-white border border-black rounded-[24px] p-8 md:p-10 card-shadow overflow-hidden" },
+                  h("div", { className: "grid-dot absolute inset-0 pointer-events-none" }),
+                  h("div", { className: "relative" },
+                    h("div", { className: "inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#ffefea] border border-black text-[11px] font-[700] tracking-[0.08em] uppercase" }, "Chống Lộ Đề • Trộn Câu & Phương Án A/B/C/D"),
+                    h("h1", { className: "font-display text-[40px] md:text-[54px] leading-[0.95] tracking-[-0.03em] mt-4" },
+                      "Luyện Thi ", h("span", { className: "text-[#ff4d2e]" }, "MOS"), h("br"),
+                      "Word & Excel", h("br"),
+                      "Đề Nâng Cao"
+                    ),
+                    h("p", { className: "mt-4 text-[15px] leading-[1.5] text-[#4a4a4a] max-w-[48ch]" },
+                      "200 câu hỏi tình huống bẫy thực chiến chuẩn MOS quốc tế (100 Word + 100 Excel), tự động xáo trộn thứ tự 50 câu hỏi và hoán đổi ngẫu nhiên vị trí 4 phương án A, B, C, D mỗi lượt thi."
+                    ),
+                    h("div", { className: "mt-6 grid grid-cols-3 gap-3" },
+                      h("div", { className: "border border-black rounded-[16px] p-3 bg-[#fff8e6]" },
+                        h("div", { className: "text-[11px] uppercase font-[700]" }, "Bảo mật đề"),
+                        h("div", { className: "font-display text-[20px] font-[800]" }, "Trộn 2 Lớp")
+                      ),
+                      h("div", { className: "border border-black rounded-[16px] p-3 bg-[#e6f6ff]" },
+                        h("div", { className: "text-[11px] uppercase font-[700]" }, "Điểm đạt"),
+                        h("div", { className: "font-display text-[20px] font-[800]" }, "700/1000")
+                      ),
+                      h("div", { className: "border border-black rounded-[16px] p-3 bg-[#e8ffe8]" },
+                        h("div", { className: "text-[11px] uppercase font-[700]" }, "Thời gian"),
+                        h("div", { className: "font-display text-[20px] font-[800]" }, "50c / 40p")
+                      )
+                    )
+                  )
+                ),
+
+                h("div", { className: "bg-white border border-black rounded-[24px] p-6 md:p-8 card-shadow" },
+                  h("div", { className: "flex items-center gap-3 mb-6" },
+                    h("div", { className: "w-10 h-10 rounded-full bg-black text-white flex items-center justify-center font-display font-[800] text-[13px]" }, "MOS"),
+                    h("div", null,
+                      h("div", { className: "font-[700] text-[16px]" }, "Đăng nhập phòng thi"),
+                      h("div", { className: "text-[12px] text-[#6b6b6b]" }, "TestOnline_MOS Word & Excel")
+                    )
+                  ),
+                  h("div", { className: "space-y-4" },
+                    h("div", null,
+                      h("label", { className: "text-[11px] font-[700] uppercase tracking-[0.08em]" }, "Tài khoản / Mã SV"),
+                      h("input", {
+                        value: loginForm.maSV,
+                        onChange: e => setLoginForm(prev => ({ ...prev, maSV: e.target.value })),
+                        onKeyDown: e => e.key === "Enter" && handleLogin(),
+                        placeholder: "Mã SV (VD: SV001, admin, gv001)",
+                        className: "mt-1 w-full h-[48px] border border-black rounded-[12px] px-4 text-[15px] outline-none focus:ring-2 focus:ring-black"
+                      })
+                    ),
+                    h("div", null,
+                      h("label", { className: "text-[11px] font-[700] uppercase tracking-[0.08em]" }, "Mật khẩu"),
+                      h("div", { className: "mt-1 relative" },
+                        h("input", {
+                          type: loginForm.showPass ? "text" : "password",
+                          value: loginForm.matKhau,
+                          onChange: e => setLoginForm(prev => ({ ...prev, matKhau: e.target.value })),
+                          onKeyDown: e => e.key === "Enter" && handleLogin(),
+                          placeholder: "Mật khẩu (VD: 123, admin123)",
+                          className: "w-full h-[48px] border border-black rounded-[12px] px-4 pr-12 text-[15px] outline-none focus:ring-2 focus:ring-black"
+                        }),
+                        h("button", {
+                          type: "button",
+                          onClick: () => setLoginForm(prev => ({ ...prev, showPass: !prev.showPass })),
+                          className: "absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-[#f1f1f1] flex items-center justify-center text-[14px]"
+                        }, "👁")
+                      )
+                    ),
+                    loginError && h("div", { className: "text-[13px] text-[#ff4d2e] font-[600] bg-[#ffefea] border border-[#ff4d2e] rounded-[10px] px-3 py-2" }, loginError),
+                    h("button", {
+                      onClick: handleLogin,
+                      className: "w-full h-[48px] bg-black text-white rounded-[12px] font-[700] text-[15px] hover:bg-[#222] transition"
+                    }, "Đăng nhập"),
+                    h("div", { className: "flex gap-2" },
+                      h("button", {
+                        type: "button",
+                        onClick: () => setLoginForm({ maSV: "SV001", matKhau: "123", showPass: false }),
+                        className: "flex-1 h-9 border border-black rounded-[10px] text-[12px] font-[600] hover:bg-[#f6f6f6]"
+                      }, "Điền nhanh SV001"),
+                      h("button", {
+                        type: "button",
+                        onClick: () => setLoginForm({ maSV: "admin", matKhau: "admin123", showPass: false }),
+                        className: "flex-1 h-9 border border-black rounded-[10px] text-[12px] font-[600] hover:bg-[#f6f6f6]"
+                      }, "Điền nhanh Admin")
+                    )
+                  ),
+                  h("div", { className: "mt-6 border-t border-black/10 pt-4 grid grid-cols-2 gap-2 text-[11px] font-mono" },
+                    h("div", { className: "bg-[#f6f6f6] border border-black rounded-[10px] p-2" }, "Thí sinh: SV001 / 123"),
+                    h("div", { className: "bg-[#f6f6f6] border border-black rounded-[10px] p-2" }, "Admin: admin / admin123"),
+                    h("div", { className: "bg-[#f6f6f6] border border-black rounded-[10px] p-2" }, "Mật khẩu ca thi: 1111"),
+                    h("div", { className: "bg-[#f6f6f6] border border-black rounded-[10px] p-2" }, "Trộn câu + Đáp án: BẬT")
+                  )
+                )
+              )
+            ) : currentUser.vaiTro === "sinhvien" ? (
+              // GIAO DIỆN SINH VIÊN
+              h("div", null,
+                studentView === "list" && h("div", null,
+                  h("div", { className: "flex flex-wrap items-center justify-between gap-2 mb-4" },
+                    h("h2", { className: "font-display text-[28px] font-[800]" }, "Chào " + currentUser.hoTen + " - " + currentUser.lop),
+                    h("div", { className: "text-[12px] font-mono bg-white border border-black rounded-full px-3 py-1" }, "Ngày thi: " + TODAY_STR + " • Mã đề sinh ngẫu nhiên")
+                  ),
+                  savedExamState && h("div", { className: "mb-4 bg-[#fff3cd] border border-black rounded-[16px] p-4 flex flex-wrap items-center justify-between gap-3" },
+                    h("div", { className: "text-[14px] font-[600]" }, "Bạn có bài thi chưa nộp — nhập lại mật khẩu ca thi + mật khẩu cá nhân để tiếp tục"),
+                    h("button", {
+                      onClick: () => setSelectedCa(cathi.find(c => c.id_cathi === savedExamState.id_cathi) || null),
+                      className: "px-4 h-9 bg-black text-white rounded-full text-[13px] font-[600]"
+                    }, "Tiếp tục làm bài")
+                  ),
+                  h("div", { className: "grid md:grid-cols-2 gap-4" },
+                    availableCathi.map(ca => {
+                      const isWord = ca.id_monhoc === "MOS_WORD";
+                      return h("div", { key: ca.id_cathi, className: "bg-white border border-black rounded-[20px] p-5 card-shadow-sm flex flex-col gap-3" },
+                        h("div", { className: "flex items-start justify-between gap-2" },
+                          h("div", null,
+                            h("div", { className: "font-[800] text-[16px]" }, ca.tenCa),
+                            h("div", { className: "text-[12px] text-[#6b6b6b] font-mono mt-1" }, ca.ngayThi + " • " + ca.thoigian_batdau + "-" + ca.thoigian_ketthuc + " • Phòng " + ca.id_phongthi + " • " + ca.id_dethi)
+                          ),
+                          h("span", { className: "px-3 py-1 border border-black rounded-full text-[11px] font-[700] " + (isWord ? "bg-[#e6f6ff]" : "bg-[#e8ffe8]") }, isWord ? "MOS Word" : "MOS Excel")
+                        ),
+                        h("div", { className: "text-[12px] text-[#4a4a4a]" }, "50 câu hỏi tình huống bẫy chuẩn MOS • Tự động trộn thứ tự câu & đáp án A/B/C/D • Đạt: 700/1000"),
+                        h("button", {
+                          onClick: () => { setSelectedCa(ca); setCaPassModal({ pass: "1111", show: false, error: "" }); },
+                          className: "w-full h-[42px] bg-black text-white rounded-[12px] text-[13px] font-[700] hover:bg-[#ff4d2e] transition"
+                        }, "Vào ca thi")
+                      );
+                    })
+                  ),
+
+                  selectedCa && !savedExamState && h("div", { className: "fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" },
+                    h("div", { className: "bg-white border border-black rounded-[24px] p-6 max-w-[420px] w-full card-shadow" },
+                      h("div", { className: "text-[11px] uppercase font-[800] tracking-[0.1em] text-[#ff4d2e]" }, "Xác thực phòng thi"),
+                      h("h3", { className: "font-display text-[22px] font-[800] mt-1" }, selectedCa.tenCa),
+                      h("p", { className: "text-[12px] text-[#6b6b6b] mt-1" }, "Nhập mật khẩu ca thi (Mặc định: ", h("strong", null, "1111"), ")"),
+                      h("div", { className: "mt-4 relative" },
+                        h("input", {
+                          type: caPassModal.show ? "text" : "password",
+                          value: caPassModal.pass,
+                          onChange: e => setCaPassModal(prev => ({ ...prev, pass: e.target.value })),
+                          onKeyDown: e => e.key === "Enter" && handleVerifyCaPass(),
+                          placeholder: "Mật khẩu ca thi (1111)",
+                          className: "w-full h-[44px] border border-black rounded-[12px] px-4 text-[14px]"
+                        }),
+                        h("button", {
+                          type: "button",
+                          onClick: () => setCaPassModal(prev => ({ ...prev, show: !prev.show })),
+                          className: "absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-[#f1f1f1] text-[13px]"
+                        }, "👁")
+                      ),
+                      caPassModal.error && h("div", { className: "mt-2 text-[12px] text-[#ff4d2e] font-[600]" }, caPassModal.error),
+                      h("div", { className: "mt-4 flex gap-2" },
+                        h("button", { onClick: () => setSelectedCa(null), className: "flex-1 h-10 border border-black rounded-[10px] text-[13px] font-[600]" }, "Hủy"),
+                        h("button", { onClick: handleVerifyCaPass, className: "flex-1 h-10 bg-black text-white rounded-[10px] text-[13px] font-[700]" }, "Xác nhận")
+                      )
+                    )
+                  ),
+
+                  selectedCa && savedExamState && h("div", { className: "fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" },
+                    h("div", { className: "bg-white border border-black rounded-[24px] p-6 max-w-[440px] w-full card-shadow" },
+                      h("div", { className: "text-[11px] uppercase font-[800] text-[#ff4d2e]" }, "Khôi phục phiên thi"),
+                      h("h3", { className: "font-display text-[20px] font-[800] mt-1" }, selectedCa.tenCa),
+                      h("div", { className: "mt-3 space-y-3" },
+                        h("input", {
+                          type: "password",
+                          value: resumeModal.personal,
+                          onChange: e => setResumeModal(prev => ({ ...prev, personal: e.target.value })),
+                          placeholder: "Mật khẩu cá nhân (123)",
+                          className: "w-full h-[40px] border border-black rounded-[10px] px-3 text-[13px]"
+                        }),
+                        h("input", {
+                          type: "password",
+                          value: resumeModal.ca,
+                          onChange: e => setResumeModal(prev => ({ ...prev, ca: e.target.value })),
+                          placeholder: "Mật khẩu ca thi (1111)",
+                          className: "w-full h-[40px] border border-black rounded-[10px] px-3 text-[13px]"
+                        })
+                      ),
+                      resumeModal.error && h("div", { className: "mt-2 text-[12px] text-[#ff4d2e]" }, resumeModal.error),
+                      h("div", { className: "mt-4 flex gap-2" },
+                        h("button", { onClick: () => setSelectedCa(null), className: "flex-1 h-10 border border-black rounded-[10px] text-[13px]" }, "Đóng"),
+                        h("button", { onClick: handleResumeExam, className: "flex-1 h-10 bg-black text-white rounded-[10px] text-[13px] font-[700]" }, "Tiếp tục thi")
+                      )
+                    )
+                  )
+                ),
+
+                // 2. Xác nhận vào thi
+                studentView === "confirm" && selectedCa && h("div", { className: "max-w-[740px] mx-auto bg-white border border-black rounded-[24px] p-8 card-shadow" },
+                  h("div", { className: "text-[11px] uppercase font-[800] tracking-[0.12em] text-[#ff4d2e]" }, "Xác nhận thông tin ca thi"),
+                  h("h2", { className: "font-display text-[30px] font-[800] leading-[1.05] mt-2" },
+                    selectedCa.tenCa, h("br"),
+                    h("span", { className: "text-[18px] font-sans font-[600] text-[#4a4a4a]" }, "Đề: " + selectedCa.id_dethi + " • 50 câu • 40 phút")
+                  ),
+                  h("div", { className: "mt-6 grid grid-cols-2 md:grid-cols-4 gap-3" },
+                    h("div", { className: "border border-black rounded-[12px] p-3 bg-[#f8f8f8]" }, h("div", { className: "text-[11px] uppercase font-[700]" }, "Số câu"), h("div", { className: "font-[800]" }, "50 câu")),
+                    h("div", { className: "border border-black rounded-[12px] p-3 bg-[#f8f8f8]" }, h("div", { className: "text-[11px] uppercase font-[700]" }, "Thời gian"), h("div", { className: "font-[800]" }, "40 phút")),
+                    h("div", { className: "border border-black rounded-[12px] p-3 bg-[#f8f8f8]" }, h("div", { className: "text-[11px] uppercase font-[700]" }, "Trộn câu hỏi"), h("div", { className: "font-[800] text-[#0a7d2e]" }, shuffleConfig.shuffleQuestions ? "BẬT" : "TẮT")),
+                    h("div", { className: "border border-black rounded-[12px] p-3 bg-[#f8f8f8]" }, h("div", { className: "text-[11px] uppercase font-[700]" }, "Trộn đáp án"), h("div", { className: "font-[800] text-[#0a7d2e]" }, shuffleConfig.shuffleOptions ? "BẬT" : "TẮT"))
+                  ),
+                  h("div", { className: "mt-6 bg-[#fffbe6] border border-black rounded-[12px] p-4 text-[13px] leading-[1.6]" },
+                    h("div", { className: "font-[700]" }, "Cơ chế chống lộ đề & đánh giá chuẩn MOS:"),
+                    h("ul", { className: "list-disc ml-5 mt-1 text-[#4a4a4a]" },
+                      h("li", null, "Hệ thống tự động ", h("strong", null, "xáo trộn thứ tự 50 câu hỏi"), " và ", h("strong", null, "đảo ngẫu nhiên vị trí 4 phương án A, B, C, D"), " cho từng thí sinh ngay khi nhấn Bắt đầu."),
+                      h("li", null, "Nội dung câu hỏi tập trung vào các tình huống bẫy thực chiến (khác biệt giữa các tùy chọn Ribbon, đối số hàm, ngắt Section, định dạng điều kiện)."),
+                      h("li", null, "Điểm đạt chuẩn MOS quốc tế: ", h("strong", null, "700 / 1000 điểm"), " (tối thiểu ", h("strong", null, "35 / 50 câu"), ").")
+                    )
+                  ),
+                  h("div", { className: "mt-6 flex gap-3" },
+                    h("button", { onClick: () => { setSelectedCa(null); setStudentView("list"); }, className: "h-[56px] px-6 border border-black rounded-[14px] font-[700] text-[15px] hover:bg-[#f6f6f6]" }, "Quay lại"),
+                    h("button", { onClick: handleStartExam, className: "flex-1 h-[56px] bg-[#ff4d2e] text-white rounded-[14px] font-[800] text-[18px] pulse border border-black card-shadow-sm" }, "BẮT ĐẦU LÀM BÀI THI")
+                  )
+                ),
+
+                // 3. Làm bài thi (3 cột)
+                studentView === "exam" && h("div", { className: "grid lg:grid-cols-[240px_1fr_290px] gap-4" },
+                  h("div", { className: "bg-white border border-black rounded-[16px] p-3 h-fit lg:sticky top-[72px]" },
+                    h("div", { className: "flex items-center justify-between" },
+                      h("div", { className: "font-[700] text-[12px] uppercase" }, "Danh sách 1..50"),
+                      h("span", { className: "text-[11px] font-mono bg-[#f1f1f1] px-2 py-0.5 rounded border border-black" }, examCode)
+                    ),
+                    h("div", { className: "mt-3 grid grid-cols-5 gap-1.5" },
+                      examQuestions.map((q, idx) => {
+                        const isAnswered = !!answers[q.id_cauhoi];
+                        const isCurrent = idx === currentIndex;
+                        const isFlagged = flaggedSet.has(idx);
+                        let bgClass = "bg-[#f1f1f1]";
+                        if (isCurrent) bgClass = "bg-[#ff4d2e] text-white";
+                        else if (isAnswered) bgClass = "bg-[#d1ffd1]";
+                        else if (isFlagged) bgClass = "bg-[#ffe27a]";
+                        return h("button", {
+                          key: idx,
+                          onClick: () => setCurrentIndex(idx),
+                          className: "h-8 w-full rounded-[8px] border border-black text-[12px] font-[700] " + bgClass
+                        }, idx + 1);
+                      })
+                    ),
+                    h("div", { className: "mt-3 text-[10px] font-mono flex flex-wrap gap-1" },
+                      h("span", { className: "px-2 py-0.5 bg-[#f1f1f1] border border-black rounded-full" }, "chưa làm"),
+                      h("span", { className: "px-2 py-0.5 bg-[#d1ffd1] border border-black rounded-full" }, "đã làm"),
+                      h("span", { className: "px-2 py-0.5 bg-[#ff4d2e] text-white border border-black rounded-full" }, "đang xem"),
+                      h("span", { className: "px-2 py-0.5 bg-[#ffe27a] border border-black rounded-full" }, "đánh dấu")
+                    ),
+                    h("button", {
+                      onClick: () => setFlaggedSet(prev => {
+                        const next = new Set(prev);
+                        if (next.has(currentIndex)) next.delete(currentIndex);
+                        else next.add(currentIndex);
+                        return next;
+                      }),
+                      className: "mt-3 w-full h-9 border border-black rounded-full text-[12px] font-[600] hover:bg-[#ffe27a]"
+                    }, flaggedSet.has(currentIndex) ? "★ Bỏ đánh dấu câu này" : "☆ Đánh dấu xem lại")
+                  ),
+
+                  h("div", { className: "bg-white border border-black rounded-[20px] p-5 md:p-6 card-shadow-sm" },
+                    h("div", { className: "flex flex-wrap items-center justify-between gap-2" },
+                      h("div", { className: "font-[800] text-[18px]" },
+                        "Câu " + (currentIndex + 1) + " / " + examQuestions.length,
+                        h("span", { className: "ml-2 px-3 py-1 bg-black text-white rounded-full text-[11px] font-[600]" }, curQ.chuDe || "")
+                      ),
+                      h("div", { className: "text-[12px] font-mono text-[#6b6b6b]" }, "Mã đề: " + examCode + " • ID gốc: " + (curQ.id_cauhoi || ""))
+                    ),
+                    h("div", { className: "mt-4 text-[16px] leading-[1.6] font-[600]" }, curQ.noidung || ""),
+                    h("div", { className: "mt-6 space-y-3" },
+                      ["A", "B", "C", "D"].map(opt => {
+                        const optKey = "option" + opt;
+                        const qId = curQ.id_cauhoi;
+                        const isChecked = answers[qId] === opt;
+                        return h("label", {
+                          key: opt,
+                          className: "flex gap-3 p-3.5 border rounded-[12px] cursor-pointer transition " + (isChecked ? "border-black bg-[#fffbe6] card-shadow-sm" : "border-[#ddd] hover:border-black")
+                        },
+                          h("input", {
+                            type: "radio",
+                            name: "q-" + currentIndex,
+                            checked: isChecked,
+                            onChange: () => setAnswers(prev => Object.assign({}, prev, { [qId]: opt })),
+                            className: "mt-1 accent-black"
+                          }),
+                          h("div", { className: "flex-1" },
+                            h("span", { className: "font-[800] mr-2" }, opt + "."),
+                            h("span", { className: "text-[14px] leading-[1.5]" }, String(curQ[optKey] || ""))
+                          )
+                        );
+                      })
+                    ),
+                    h("div", { className: "mt-6 flex justify-between" },
+                      h("button", {
+                        onClick: () => setCurrentIndex(prev => Math.max(0, prev - 1)),
+                        disabled: currentIndex === 0,
+                        className: "h-10 px-5 border border-black rounded-full font-[600] text-[13px] hover:bg-[#f6f6f6] disabled:opacity-40"
+                      }, "← Câu trước"),
+                      h("button", {
+                        onClick: () => setCurrentIndex(prev => Math.min(examQuestions.length - 1, prev + 1)),
+                        disabled: currentIndex === examQuestions.length - 1,
+                        className: "h-10 px-5 bg-black text-white rounded-full font-[600] text-[13px] hover:bg-[#222] disabled:opacity-40"
+                      }, "Câu tiếp →")
+                    )
+                  ),
+
+                  h("div", { className: "bg-white border border-black rounded-[16px] p-4 h-fit lg:sticky top-[72px]" },
+                    h("div", { className: "font-[700] text-[12px] uppercase" }, "Thời gian còn lại"),
+                    h("div", { className: "mt-3 text-[34px] font-display font-[800] text-center border border-black rounded-[12px] py-2 " + (timeLeft < 300 ? "bg-[#ff4d2e] text-white pulse" : "bg-[#f8f8f8]") }, formatTime(timeLeft)),
+                    h("div", { className: "mt-2 text-[11px] font-mono text-center text-[#6b6b6b]" }, "40:00 (cảnh báo đỏ < 5 phút)"),
+                    h("div", { className: "mt-4 space-y-2 text-[13px] border-t border-black/10 pt-3" },
+                      h("div", { className: "flex justify-between" }, h("span", null, "Mã đề cá nhân:"), h("strong", { className: "font-mono" }, examCode)),
+                      h("div", { className: "flex justify-between" }, h("span", null, "Đã trả lời:"), h("strong", null, Object.keys(answers).length + " / " + examQuestions.length)),
+                      h("div", { className: "flex justify-between" }, h("span", null, "Đánh dấu xem lại:"), h("strong", null, flaggedSet.size)),
+                      h("div", { className: "flex justify-between" }, h("span", null, "Điểm đạt chuẩn:"), h("strong", null, "700 / 1000"))
+                    ),
+                    h("button", {
+                      onClick: () => {
+                        const cnt = Object.keys(answers).length;
+                        const msg = cnt < examQuestions.length
+                          ? "Bạn mới hoàn thành " + cnt + "/" + examQuestions.length + " câu. Xác nhận nộp bài ngay?"
+                          : "Bạn đã hoàn thành " + examQuestions.length + "/" + examQuestions.length + " câu. Xác nhận nộp bài thi?";
+                        if (window.confirm(msg)) handleSubmitExam();
+                      },
+                      className: "mt-4 w-full h-[48px] bg-black text-white rounded-[12px] font-[800] hover:bg-[#15803d] transition"
+                    }, "NỘP BÀI THI"),
+                    h("div", { className: "mt-2 text-[11px] text-[#6b6b6b] text-center" }, "Đã kích hoạt trộn câu & trộn đáp án")
+                  )
+                ),
+
+                // 4. Kết quả sau khi nộp bài
+                studentView === "result" && latestResult && h("div", { className: "max-w-[960px] mx-auto" },
+                  h("div", { className: "bg-white border border-black rounded-[24px] p-8 card-shadow text-center" },
+                    h("div", { className: "inline-block px-4 py-1.5 rounded-full border border-black text-[12px] font-[800] uppercase tracking-[0.08em] " + (latestResult.isPassed ? "bg-[#d1ffd1] text-[#0a7d2e]" : "bg-[#ffefea] text-[#ff4d2e]") },
+                      latestResult.isPassed ? "🎉 CHÚC MỪNG: ĐẠT CHUẨN MOS (PASS ≥ 700)" : "⚠️ CHƯA ĐẠT CHUẨN MOS (FAIL — CẦN ≥ 700 ĐIỂM)"
+                    ),
+                    h("div", { className: "mt-4 font-display text-[52px] md:text-[64px] font-[800] leading-[0.9] " + (latestResult.isPassed ? "text-[#0a7d2e]" : "text-[#ff4d2e]") },
+                      latestResult.mosScore + " / 1000"
+                    ),
+                    h("div", { className: "mt-2 text-[16px] font-[700] text-[#4a4a4a]" },
+                      "Quy đổi thang 10: ", h("span", { className: "text-black" }, latestResult.diem10 + " / 10 điểm"),
+                      " • Mã đề: ", h("span", { className: "font-mono text-black" }, latestResult.maDe)
+                    ),
+                    h("div", { className: "mt-4 flex flex-wrap justify-center gap-2" },
+                      h("span", { className: "px-3 py-1 bg-black text-white rounded-full text-[12px] font-[700]" }, "Đúng " + latestResult.soCauDung + "/" + latestResult.tongCau + " câu (" + latestResult.diemPhanTram + "%)"),
+                      h("span", { className: "px-3 py-1 bg-[#ffe27a] border border-black rounded-full text-[12px] font-[700]" }, latestResult.xepLoai),
+                      h("span", { className: "px-3 py-1 bg-[#f1f1f1] border border-black rounded-full text-[12px] font-mono" }, "Thời gian làm: " + latestResult.thoiGianLamBai)
+                    ),
+                    h("div", { className: "mt-6 grid md:grid-cols-2 gap-3 max-w-[460px] mx-auto" },
+                      h("button", { onClick: () => handleExportPersonalExcel(latestResult), className: "h-[48px] bg-[#ff4d2e] text-white rounded-[12px] font-[800] border border-black card-shadow-sm" }, "Xuất Excel kết quả"),
+                      h("button", { onClick: () => { setSelectedCa(null); setStudentView("list"); }, className: "h-[48px] bg-white border border-black rounded-[12px] font-[700] hover:bg-[#f6f6f6]" }, "Chọn Ca Thi / Môn Khác")
+                    )
+                  ),
+
+                  h("div", { className: "mt-6 bg-white border border-black rounded-[24px] p-6 card-shadow-sm" },
+                    h("div", { className: "font-[800] text-[16px] mb-4" }, "Xem chi tiết đúng / sai & Giải thích chuẩn MOS (" + examQuestions.length + " câu)"),
+                    h("div", { className: "space-y-4" },
+                      examQuestions.map((q, idx) => {
+                        const chosen = latestResult.answers[q.id_cauhoi] || "";
+                        const isCorrect = chosen === q.correct;
+                        return h("div", { key: q.id_cauhoi, className: "border border-black rounded-[16px] p-4 " + (isCorrect ? "bg-[#f4fff4]" : "bg-[#fff6f5]") },
+                          h("div", { className: "flex flex-wrap items-center justify-between gap-2 text-[12px] font-[700]" },
+                            h("span", null, "Câu " + (idx + 1) + " • ", h("span", { className: "px-2 py-0.5 bg-white border border-black rounded-full" }, q.chuDe)),
+                            h("span", { className: isCorrect ? "text-[#0a7d2e]" : "text-[#ff4d2e]" }, isCorrect ? "✓ ĐÚNG" : "✕ SAI (Chọn: " + (chosen || "Bỏ trống") + " | Đúng: " + q.correct + ")")
+                          ),
+                          h("div", { className: "mt-2 font-[600] text-[14px]" }, q.noidung),
+                          h("div", { className: "mt-2 grid md:grid-cols-2 gap-1.5 text-[13px]" },
+                            ["A", "B", "C", "D"].map(opt => {
+                              const isRightOpt = q.correct === opt;
+                              const isChosenWrong = chosen === opt && !isRightOpt;
+                              let cls = "bg-white border-black/15";
+                              if (isRightOpt) cls = "bg-[#d1ffd1] border-black font-[700]";
+                              else if (isChosenWrong) cls = "bg-[#ffd6d1] border-[#ff4d2e]";
+                              return h("div", { key: opt, className: "px-3 py-1.5 rounded-[8px] border " + cls },
+                                h("strong", null, opt + ". "), q["option" + opt]
+                              );
+                            })
+                          ),
+                          h("div", { className: "mt-2.5 text-[12px] bg-white border-l-4 border-black px-3 py-2 rounded-r-[8px] text-[#333]" },
+                            h("strong", null, "💡 Giải thích chuẩn MOS: "), q.explanation
+                          )
+                        );
+                      })
+                    )
+                  )
+                )
+              )
+            ) : (
+              // GIAO DIỆN GIÁO VIÊN / ADMIN
+              h("div", null,
+                h("div", { className: "flex flex-wrap items-center justify-between gap-3 mb-5" },
+                  h("div", null,
+                    h("h2", { className: "font-display text-[28px] font-[800]" }, "Quản Trị Hệ Thống Thi MOS"),
+                    h("p", { className: "text-[13px] text-[#6b6b6b]" }, "200 câu hỏi MOS Word & Excel nâng cao • Chống lộ đề 2 lớp")
+                  ),
+                  h("div", { className: "flex flex-wrap gap-2" },
+                    [
+                      ["dashboard", "Thống kê & Điểm"],
+                      ["cauhoi", "Ngân hàng câu hỏi (" + cauhoi.length + ")"],
+                      ["dethi", "Cấu hình Trộn đề & Ca thi"],
+                      ["users", "Thí sinh (" + users.length + ")"]
+                    ].map(([key, label]) => h("button", {
+                      key: key,
+                      onClick: () => setAdminTab(key),
+                      className: "h-9 px-4 border border-black rounded-full text-[13px] font-[700] transition " + (adminTab === key ? "bg-black text-white" : "bg-white hover:bg-[#f1f1f1]")
+                    }, label))
+                  )
+                ),
+
+                adminTab === "dashboard" && h("div", { className: "space-y-4" },
+                  h("div", { className: "grid grid-cols-2 md:grid-cols-4 gap-4" },
+                    h("div", { className: "bg-white border border-black rounded-[20px] p-4 card-shadow-sm" },
+                      h("div", { className: "text-[11px] uppercase font-[700] text-[#6b6b6b]" }, "Tổng câu hỏi MOS"),
+                      h("div", { className: "font-display text-[32px] font-[800] mt-1" }, cauhoi.length),
+                      h("div", { className: "text-[11px] text-[#6b6b6b]" }, "Đáp án gốc chia đều A/B/C/D")
+                    ),
+                    h("div", { className: "bg-white border border-black rounded-[20px] p-4 card-shadow-sm" },
+                      h("div", { className: "text-[11px] uppercase font-[700] text-[#6b6b6b]" }, "Lượt đã nộp bài"),
+                      h("div", { className: "font-display text-[32px] font-[800] mt-1" }, ketqua.length),
+                      h("div", { className: "text-[11px] text-[#6b6b6b]" }, "Mỗi lượt sinh mã đề riêng")
+                    ),
+                    h("div", { className: "bg-white border border-black rounded-[20px] p-4 card-shadow-sm" },
+                      h("div", { className: "text-[11px] uppercase font-[700] text-[#6b6b6b]" }, "Điểm TB MOS"),
+                      h("div", { className: "font-display text-[32px] font-[800] mt-1" }, ketqua.length ? Math.round(ketqua.reduce((a, b) => a + b.mosScore, 0) / ketqua.length) : 0),
+                      h("div", { className: "text-[11px] text-[#6b6b6b]" }, "Chuẩn đạt: ≥ 700 / 1000")
+                    ),
+                    h("div", { className: "bg-white border border-black rounded-[20px] p-4 card-shadow-sm" },
+                      h("div", { className: "text-[11px] uppercase font-[700] text-[#6b6b6b]" }, "Tỷ lệ đạt chuẩn"),
+                      h("div", { className: "font-display text-[32px] font-[800] mt-1 text-[#0a7d2e]" }, (ketqua.length ? Math.round((ketqua.filter(k => k.mosScore >= 700).length / ketqua.length) * 100) : 0) + "%"),
+                      h("div", { className: "text-[11px] text-[#6b6b6b]" }, "Xuất Excel 4 sheet")
+                    )
+                  ),
+                  h("div", { className: "bg-white border border-black rounded-[20px] p-5 card-shadow-sm" },
+                    h("div", { className: "flex flex-wrap items-center justify-between gap-3 mb-4" },
+                      h("h3", { className: "font-[800] text-[16px]" }, "Bảng điểm thí sinh đã thi"),
+                      h("button", { onClick: handleExportFullExcel, className: "h-9 px-4 bg-[#ff4d2e] text-white border border-black rounded-full text-[13px] font-[700]" }, "Xuất Excel tổng hợp (4 sheets)")
+                    ),
+                    ketqua.length === 0 ? h("div", { className: "text-[13px] text-[#6b6b6b] py-6 text-center border border-dashed border-black/30 rounded-[12px]" },
+                      "Chưa có thí sinh nào nộp bài trong phiên làm việc này. Hãy đăng nhập bằng tài khoản ", h("strong", null, "SV001 / 123"), " để làm thử bài thi."
+                    ) : h("div", { className: "overflow-auto border border-black rounded-[12px]" },
+                      h("table", { className: "w-full text-[13px] text-left" },
+                        h("thead", { className: "bg-black text-white" },
+                          h("tr", null,
+                            h("th", { className: "p-2.5" }, "Mã SV"),
+                            h("th", { className: "p-2.5" }, "Họ tên"),
+                            h("th", { className: "p-2.5" }, "Mã đề"),
+                            h("th", { className: "p-2.5" }, "Ca thi"),
+                            h("th", { className: "p-2.5" }, "Đúng"),
+                            h("th", { className: "p-2.5" }, "Điểm MOS"),
+                            h("th", { className: "p-2.5" }, "Thang 10"),
+                            h("th", { className: "p-2.5" }, "Kết quả")
+                          )
+                        ),
+                        h("tbody", null,
+                          ketqua.map(k => h("tr", { key: k.id_ketqua, className: "border-t border-black/15" },
+                            h("td", { className: "p-2.5 font-mono" }, k.mssv),
+                            h("td", { className: "p-2.5 font-[600]" }, k.hoten),
+                            h("td", { className: "p-2.5 font-mono" }, k.maDe),
+                            h("td", { className: "p-2.5" }, k.id_cathi),
+                            h("td", { className: "p-2.5" }, k.soCauDung + "/" + k.tongCau),
+                            h("td", { className: "p-2.5 font-[800]" }, k.mosScore + "/1000"),
+                            h("td", { className: "p-2.5 font-[700]" }, k.diem10),
+                            h("td", { className: "p-2.5" }, k.xepLoai)
+                          ))
+                        )
+                      )
+                    )
+                  )
+                ),
+
+                adminTab === "cauhoi" && h("div", { className: "bg-white border border-black rounded-[20px] p-5 card-shadow-sm" },
+                  h("div", { className: "flex flex-wrap gap-2 mb-4" },
+                    h("select", {
+                      value: filterMon,
+                      onChange: e => { setFilterMon(e.target.value); setFilterChuong("all"); },
+                      className: "h-9 border border-black rounded-[10px] px-3 text-[13px] font-[600]"
+                    },
+                      h("option", { value: "all" }, "Tất cả môn (200 câu)"),
+                      h("option", { value: "MOS_WORD" }, "MOS Word (100 câu)"),
+                      h("option", { value: "MOS_EXCEL" }, "MOS Excel (100 câu)")
+                    ),
+                    h("select", {
+                      value: filterChuong,
+                      onChange: e => setFilterChuong(e.target.value),
+                      className: "h-9 border border-black rounded-[10px] px-3 text-[13px] font-[600]"
+                    },
+                      h("option", { value: "all" }, "Tất cả ca thi"),
+                      chuong.filter(c => filterMon === "all" || c.id_monhoc === filterMon).map(c =>
+                        h("option", { key: c.id_chuong, value: c.id_chuong }, c.ten_chuong)
+                      )
+                    ),
+                    h("input", {
+                      value: searchQ,
+                      onChange: e => setSearchQ(e.target.value),
+                      placeholder: "Tìm nội dung hoặc chủ đề...",
+                      className: "flex-1 min-w-[200px] h-9 border border-black rounded-[10px] px-3 text-[13px]"
+                    })
+                  ),
+                  h("div", { className: "overflow-auto max-h-[520px] border border-black rounded-[12px]" },
+                    h("table", { className: "w-full text-[13px] text-left" },
+                      h("thead", { className: "bg-black text-white sticky top-0" },
+                        h("tr", null,
+                          h("th", { className: "p-2.5" }, "Mã"),
+                          h("th", { className: "p-2.5" }, "Ca thi"),
+                          h("th", { className: "p-2.5" }, "Chủ đề"),
+                          h("th", { className: "p-2.5" }, "Nội dung câu hỏi"),
+                          h("th", { className: "p-2.5" }, "Đáp án gốc")
+                        )
+                      ),
+                      h("tbody", null,
+                        filteredCauhoi.map(q => h("tr", { key: q.id_cauhoi, className: "border-t border-black/15 hover:bg-[#f8f8f8]" },
+                          h("td", { className: "p-2.5 font-mono font-[700]" }, q.id_cauhoi),
+                          h("td", { className: "p-2.5 font-mono text-[11px]" }, q.id_chuong),
+                          h("td", { className: "p-2.5 text-[12px]" }, q.chuDe),
+                          h("td", { className: "p-2.5" }, q.noidung),
+                          h("td", { className: "p-2.5 font-[800] text-center" }, q.correct)
+                        ))
+                      )
+                    )
+                  )
+                ),
+
+                adminTab === "dethi" && h("div", { className: "space-y-4" },
+                  h("div", { className: "bg-white border border-black rounded-[20px] p-5 card-shadow-sm" },
+                    h("div", { className: "font-[800] text-[16px] mb-3" }, "Cấu hình chống lộ đề tự động khi phát đề cho thí sinh"),
+                    h("div", { className: "grid md:grid-cols-2 gap-4" },
+                      h("label", { className: "flex items-center justify-between p-4 border border-black rounded-[14px] bg-[#f8f8f8] cursor-pointer" },
+                        h("div", null,
+                          h("div", { className: "font-[700] text-[14px]" }, "Trộn ngẫu nhiên thứ tự 50 câu hỏi"),
+                          h("div", { className: "text-[12px] text-[#6b6b6b]" }, "Mỗi thí sinh nhận thứ tự câu 1..50 hoàn toàn khác nhau")
+                        ),
+                        h("input", {
+                          type: "checkbox",
+                          checked: shuffleConfig.shuffleQuestions,
+                          onChange: e => setShuffleConfig(prev => ({ ...prev, shuffleQuestions: e.target.checked })),
+                          className: "w-5 h-5 accent-black"
+                        })
+                      ),
+                      h("label", { className: "flex items-center justify-between p-4 border border-black rounded-[14px] bg-[#f8f8f8] cursor-pointer" },
+                        h("div", null,
+                          h("div", { className: "font-[700] text-[14px]" }, "Trộn ngẫu nhiên 4 phương án trả lời (A, B, C, D)"),
+                          h("div", { className: "text-[12px] text-[#6b6b6b]" }, "Đảo vị trí đáp án đúng ngẫu nhiên trên từng câu hỏi")
+                        ),
+                        h("input", {
+                          type: "checkbox",
+                          checked: shuffleConfig.shuffleOptions,
+                          onChange: e => setShuffleConfig(prev => ({ ...prev, shuffleOptions: e.target.checked })),
+                          className: "w-5 h-5 accent-black"
+                        })
+                      )
+                    )
+                  ),
+                  h("div", { className: "grid md:grid-cols-2 gap-4" },
+                    cathi.map(ca => h("div", { key: ca.id_cathi, className: "bg-white border border-black rounded-[20px] p-5 card-shadow-sm" },
+                      h("div", { className: "font-[800] text-[16px]" }, ca.tenCa),
+                      h("div", { className: "mt-1 text-[12px] font-mono text-[#6b6b6b]" }, "Mã ca: " + ca.id_cathi + " • Đề: " + ca.id_dethi + " • Phòng: " + ca.id_phongthi + " • Mật khẩu: " + ca.matKhauCaThi),
+                      h("div", { className: "mt-2 text-[13px]" }, "Thời gian: ", h("strong", null, ca.thoigian_batdau + " - " + ca.thoigian_ketthuc), " (" + ca.ngayThi + ") • Số câu: ", h("strong", null, "50 câu / 40 phút"))
+                    ))
+                  )
+                ),
+
+                adminTab === "users" && h("div", { className: "bg-white border border-black rounded-[20px] p-5 card-shadow-sm" },
+                  h("div", { className: "overflow-auto border border-black rounded-[12px]" },
+                    h("table", { className: "w-full text-[13px] text-left" },
+                      h("thead", { className: "bg-black text-white" },
+                        h("tr", null,
+                          h("th", { className: "p-2.5" }, "Mã SV"),
+                          h("th", { className: "p-2.5" }, "Họ tên"),
+                          h("th", { className: "p-2.5" }, "Lớp"),
+                          h("th", { className: "p-2.5" }, "Mật khẩu"),
+                          h("th", { className: "p-2.5" }, "Vai trò")
+                        )
+                      ),
+                      h("tbody", null,
+                        users.map(u => h("tr", { key: u.id_user, className: "border-t border-black/15" },
+                          h("td", { className: "p-2.5 font-mono font-[700]" }, u.mssv),
+                          h("td", { className: "p-2.5" }, u.hoTen),
+                          h("td", { className: "p-2.5" }, u.lop),
+                          h("td", { className: "p-2.5 font-mono" }, u.matKhau),
+                          h("td", { className: "p-2.5 uppercase text-[11px] font-[700]" }, u.vaiTro)
+                        ))
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
+        );
+      }
+
+      window.__APP_MOUNTED__ = true;
+      const root = ReactDOM.createRoot(document.getElementById("root"));
+      root.render(h(TestOnlineApp));
+    };
+  </script>
+</body>
+</html>
